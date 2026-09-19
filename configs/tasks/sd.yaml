@@ -1,0 +1,11 @@
+family: sd
+kind: diarization
+data_dirs: [sd_sinhala, sd_tamil]
+languages: [sinhala, tamil]
+primary_metric: der  # NOT YET COMPUTED -- see notes
+status: not_implemented
+notes: >
+  data/sd_{sinhala,tamil} hold paired wav/rttm files, not a labels.csv /
+  transcripts.csv / trials_*.csv, so there is no probe/CTC runner for it yet.
+  slsb.tasks.speaker_diarization.run() raises NotImplementedError by design
+  (never fabricate a DER score). See KNOWN_ISSUES.md.

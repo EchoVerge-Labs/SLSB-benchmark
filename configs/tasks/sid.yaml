@@ -1,0 +1,10 @@
+family: sid
+kind: classification
+data_dirs: [sid]
+languages: [multilingual]
+primary_metric: accuracy
+secondary_metrics: [macro_f1]
+head: linear  # WeightedSum + mean-pool + linear (slsb.tasks._common.ClassificationHead)
+notes: >
+  The head trained here is reused by the asv family as an embedding extractor
+  (see configs/tasks/asv.yaml) -- run sid before asv for a given upstream/seed.

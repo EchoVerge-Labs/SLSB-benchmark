@@ -1,0 +1,9 @@
+family: asv
+kind: verification
+data_dirs: [asv]
+languages: [sinhala, tamil]  # trials_sinhala.csv, trials_tamil.csv inside data/asv/
+primary_metric: eer
+head: reused_from_sid  # no separate ASV training set; embeds trial pairs with SID's trained head
+notes: >
+  Requires sid to have run first for the same upstream/seed (slsb.runner enforces
+  this ordering). Score is cosine-similarity EER over held-out trial pairs.

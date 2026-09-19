@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "slsb"
+version = "0.1.0"
+description = "SLSB-benchmark — frozen-upstream SUPERB-style benchmark for Sinhala / Sri Lankan Tamil speech tasks"
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+    "torch",
+    "torchaudio",
+    "transformers",
+    "s3prl==0.4.17",
+    "datasets",
+    "huggingface_hub",
+    "soundfile",
+    "librosa",
+    "scipy",
+    "numpy",
+    "scikit-learn",
+    "jiwer",
+    "mlflow",
+    "omegaconf",
+    "pydantic",
+    "rich",
+    "PyYAML",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[project.scripts]
+slsb = "slsb.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/slsb"]
+
+[tool.ruff]
+line-length = 120

@@ -1,0 +1,17 @@
+/data/
+/results/
+/runs/
+/models/
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.env
+wandb/
+*.pt
+*.bin
+*.safetensors
+/data

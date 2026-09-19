@@ -1,0 +1,25 @@
+# Standard SUPERB-style downstream head settings. NOTE (current implementation
+# status): the linear probe (slsb/tasks/_common.py) and CTC head (slsb/tasks/asr.py)
+# implement weighted_sum, frozen_upstream, and pooling: mean as-is. hidden_dim,
+# num_layers, dropout, scheduler, warmup_ratio, and early_stopping_patience are
+# declared here for the intended protocol but not yet wired into the training
+# loop, which currently trains a single linear layer with plain Adam for a fixed
+# number of epochs (params.yaml controls epochs/lr/batch_size today). See
+# KNOWN_ISSUES.md.
+downstream_head:
+  hidden_dim: 256
+  num_layers: 2
+  dropout: 0.1
+  pooling: mean  # for utterance-level tasks
+
+training:
+  epochs: 30
+  lr: 1.0e-4
+  scheduler: linear_warmup
+  warmup_ratio: 0.1
+  batch_size: 32
+  early_stopping_patience: 5
+
+evaluation:
+  frozen_upstream: true
+  weighted_sum: true  # learned weighted sum over upstream layers

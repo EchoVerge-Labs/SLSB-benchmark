@@ -1,0 +1,10 @@
+family: asr
+kind: asr
+data_dirs: [asr_sinhala, asr_tamil, asr_omni_sinhala]
+languages: [sinhala, tamil]
+primary_metric: wer
+secondary_metrics: [cer]
+head: ctc  # WeightedSum + linear -> CTC (slsb.tasks.asr.CTCHead)
+notes: >
+  Audio is never truncated (would desync transcript from audio); long clips are
+  sub-batched by a sample budget instead (see MAX_BATCH_SAMPLE_BUDGET).

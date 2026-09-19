@@ -1,0 +1,13 @@
+family: er
+kind: classification
+data_dirs: [er_tamil]  # er_sinhala EXCLUDED -- known dataset-quality issues, see KNOWN_ISSUES.md
+languages: [tamil]
+primary_metric: accuracy
+secondary_metrics: [macro_f1]
+head: linear  # WeightedSum + mean-pool + linear (slsb.tasks._common.ClassificationHead)
+split: leakage_free  # default; see slsb.utils.datasets.load_classification_task_leakage_free
+notes: >
+  A plain random split leaks speaker/sentence identity for this corpus family;
+  the leakage-free (speaker/sentence-disjoint) split is the validated default.
+  er_tamil (22 speakers) is the primary result; a single-speaker corpus like the
+  excluded er_sinhala can only ever be sentence-disjoint, not speaker-disjoint.
