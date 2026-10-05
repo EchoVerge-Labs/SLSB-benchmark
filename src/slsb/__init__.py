@@ -1,1 +1,4 @@
-__version__ = "0.1.0"
+__version__ = "0.2.0"
+# Evaluation protocol: splits, heads and model selection. Scores from different
+# protocols are not comparable -- see README.md "Protocol".
+PROTOCOL = "v0.2"

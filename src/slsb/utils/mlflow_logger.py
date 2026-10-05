@@ -8,6 +8,8 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from slsb import PROTOCOL, __version__
+
 CSV_COLUMNS = ["upstream", "task", "language", "metric", "value", "status", "git_commit", "timestamp", "split"]
 DEFAULT_EXPERIMENT = "SLSB-benchmark"
 
@@ -63,17 +65,19 @@ def _append_csv_rows(csv_path: Path, rows: list[dict]):
 
 
 def log_run(csv_path: Path, upstream: str, task: str, language: str, seed: int, metrics: dict,
-            perf: dict = None, split: str = "random", mlflow_uri: str = None,
+            perf: dict = None, split: str = "random", details: dict = None, mlflow_uri: str = None,
             experiment: str = DEFAULT_EXPERIMENT, repo_root: Path = None):
     """metrics: the benchmark score(s) for this run, e.g. {"accuracy": 0.98, "macro_f1": 0.97}
     (or {"wer":.., "cer":..} / {"eer":..}) -- each becomes its own row in
     <csv_path> (the master score table).
 
-    perf: run performance context, e.g. {"seconds_per_step": 0.3, "peak_gpu_gb": 1.5} --
+    perf: run performance context, e.g. {"train_seconds": 310.0, "peak_gpu_gb": 1.5} --
     logged to MLflow only, not written to the CSV (keeps the master table to scores).
 
-    split: how train/test was split for this run -- "random" (default) or
-    "speaker_disjoint" for tasks where GroupShuffleSplit grouped by speaker.
+    split: the task's split_type from its split_v2.json (e.g. "speaker_disjoint").
+
+    details: what the probe settled on, e.g. {"lr": 1e-3, "best_epoch": 12,
+    "dev_cer": 0.21} -- logged to MLflow as probe_* params, not to the CSV.
 
     Both are logged together as a single MLflow run per (upstream, task, language).
     """
@@ -97,7 +101,11 @@ def log_run(csv_path: Path, upstream: str, task: str, language: str, seed: int, 
         mlflow.log_params({
             "upstream": upstream, "task": task, "language": language,
             "seed": seed, "git_commit": git_commit, "split": split,
+            "protocol": PROTOCOL, "slsb_version": __version__,
         })
+        if details:
+            # MLflow caps a param value at 6000 characters.
+            mlflow.log_params({f"probe_{k}": str(v)[:6000] for k, v in details.items()})
         for name, value in metrics.items():
             mlflow.log_metric(name, value)
         for name, value in (perf or {}).items():

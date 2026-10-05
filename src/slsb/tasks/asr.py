@@ -1,113 +1,105 @@
-"""CTC ASR probe: frozen upstream + weighted-sum + linear CTC head. Reports WER/CER.
+"""ASR: frozen upstream + learned weighted sum over layers + 2-layer BiLSTM +
+CTC over characters (SUPERB's ASR downstream). Greedy decoding, no language
+model. Early-stopped on dev CER; reports test WER and CER.
 
-ASR audio is never truncated (that would desync the transcript from the audio),
-so a batch can contain very long clips. To avoid OOM on those without changing
-the data, an over-budget batch is split into smaller sub-batches that are each
-forward/backward-passed separately, with gradients accumulated (scaled by each
-sub-batch's share) before a single optimizer step -- same effective batch,
-bounded peak memory.
+Every layer's frames are extracted once (slsb/features.py) and the head trains
+on those, so the upstream runs once per task instead of once per epoch. Audio
+is never cropped -- that would desync the transcript.
 """
-import time
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 
-import numpy as np
 import torch
 import torch.nn as nn
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
+from slsb.features import FrameStore, extract_frames, length_batches
 from slsb.metrics import compute as metrics
-from slsb.tasks._common import WeightedSum, iterate_batches, reset_peak_memory, peak_gpu_gb
-from slsb.utils.datasets import load_asr_task
-
-MAX_BATCH_SAMPLE_BUDGET = 8_000_000  # ~500s of total padded audio per forward/backward pass
+from slsb.tasks._common import WeightedSum, fit_with_dev, learning_rates, peak_gpu_gb, reset_peak_memory
+from slsb.utils.datasets import load_split, load_vocab, read_transcripts
 
 
-class CTCHead(nn.Module):
-    def __init__(self, num_layers, hidden_size, vocab_size):
+class BLSTMCTCHead(nn.Module):
+    def __init__(self, num_layers, input_size, vocab_size, hidden_size, rnn_layers, dropout):
         super().__init__()
         self.weighted_sum = WeightedSum(num_layers)
-        self.linear = nn.Linear(hidden_size, vocab_size)
+        self.rnn = nn.LSTM(input_size, hidden_size, num_layers=rnn_layers, dropout=dropout,
+                           bidirectional=True, batch_first=True)
+        self.dropout = nn.Dropout(dropout)
+        self.out = nn.Linear(2 * hidden_size, vocab_size)
 
-    def forward(self, hidden_states):  # (L,B,T,H) -> log-probs (B,T,V)
-        logits = self.linear(self.weighted_sum(hidden_states))
-        return nn.functional.log_softmax(logits, dim=-1)
-
-
-def _encode(transcript, vocab):
-    return [vocab.get(c, vocab["<unk>"]) for c in transcript]
-
-
-def load_items(dataset, indices):
-    waveforms, transcripts = [], []
-    for i in indices:
-        wav, transcript = dataset[i]
-        waveforms.append(wav)
-        transcripts.append(transcript)
-    return waveforms, transcripts
+    def forward(self, hidden_states, lengths):  # (L,B,T,H), (B,) -> log-probs (B,T,V)
+        x = self.weighted_sum(hidden_states, dim=0)
+        packed = pack_padded_sequence(x, lengths.cpu(), batch_first=True, enforce_sorted=False)
+        y, _ = self.rnn(packed)
+        y, _ = pad_packed_sequence(y, batch_first=True, total_length=x.shape[1])
+        return nn.functional.log_softmax(self.out(self.dropout(y)), dim=-1)
 
 
-def encode_targets(transcripts, vocab):
-    targets, target_lengths = [], []
-    for t in transcripts:
-        ids = _encode(t, vocab)
-        targets.extend(ids)
-        target_lengths.append(len(ids))
-    return torch.tensor(targets, dtype=torch.long), torch.tensor(target_lengths, dtype=torch.long)
+@dataclass
+class ASRFeatures:
+    store: FrameStore
+    files: list
+    transcripts: list
+    vocab: dict
+    split: dict
+    device: torch.device
+
+    def rows(self, part):
+        position = {f: i for i, f in enumerate(self.files)}
+        return [position[f] for f in self.split[part]]
+
+    def cleanup(self):
+        self.store.cleanup()
 
 
-def split_by_budget(waveforms, max_items, max_budget):
-    """Greedily group local indices into [waveforms] so max_len_in_group * group_size
-    never exceeds max_budget (and never exceeds max_items)."""
-    chunks, current, current_max = [], [], 0
-    for i, w in enumerate(waveforms):
-        length = len(w)
-        prospective_max = max(current_max, length)
-        if current and (len(current) >= max_items or prospective_max * (len(current) + 1) > max_budget):
-            chunks.append(current)
-            current, current_max = [i], length
-        else:
-            current.append(i)
-            current_max = prospective_max
-    if current:
-        chunks.append(current)
-    return chunks
+def prepare(upstream, spec, params, work_dir, shared):
+    split = load_split(spec)
+    transcript_of = read_transcripts(spec)
+    files = split["train"] + split["dev"] + split["test"]
+    vocab = load_vocab(spec, list(transcript_of.values()))
+    store = extract_frames(upstream, [spec.audio_dir / f for f in files], work_dir / "frames")
+    return ASRFeatures(store, files, [transcript_of[f] for f in files], vocab, split, upstream.device)
 
 
-def train_ctc_probe(upstream, train_ds, vocab, params, seed=42):
-    head = CTCHead(upstream.num_hidden_states, upstream.hidden_size, len(vocab)).to(upstream.device)
-    optimizer = torch.optim.Adam(head.parameters(), lr=params["lr"])
-    ctc_loss = nn.CTCLoss(blank=vocab["<blank>"], zero_infinity=True)
-    rng = np.random.RandomState(seed)
-
-    head.train()
-    for _ in range(params["epochs"]):
-        for batch_idx in iterate_batches(len(train_ds), params["batch_size"], shuffle=True, rng=rng):
-            waveforms, transcripts = load_items(train_ds, batch_idx)
-            optimizer.zero_grad()
-            for sub in split_by_budget(waveforms, params["batch_size"], MAX_BATCH_SAMPLE_BUDGET):
-                sub_waveforms = [waveforms[j] for j in sub]
-                targets, target_lengths = encode_targets([transcripts[j] for j in sub], vocab)
-                hidden_states, frame_mask = upstream.extract(sub_waveforms)
-                log_probs = head(hidden_states)
-                input_lengths = frame_mask.sum(dim=1)
-                loss = ctc_loss(
-                    log_probs.transpose(0, 1),  # CTCLoss wants (T,B,V)
-                    targets.to(upstream.device),
-                    input_lengths.to(upstream.device),
-                    target_lengths.to(upstream.device),
-                )
-                (loss * len(sub) / len(batch_idx)).backward()
-            optimizer.step()
-    return head
+def _load_batch(store: FrameStore, rows):
+    arrays = [store.load(r) for r in rows]
+    num_layers, _, hidden = arrays[0].shape
+    lengths = torch.tensor([a.shape[1] for a in arrays])
+    x = torch.zeros(num_layers, len(rows), int(lengths.max()), hidden, dtype=torch.float16)
+    for j, a in enumerate(arrays):
+        x[:, j, :a.shape[1]] = torch.from_numpy(a)
+    return rows, x, lengths
 
 
-def greedy_decode(log_probs, frame_mask, vocab):
+def _batches(features, rows, cfg, rng=None):
+    """Yields (rows, (L,B,T,H) fp16 CPU, lengths); the next batch is read from
+    disk while the current one is on the GPU."""
+    lengths = [features.store.lengths[r] for r in rows]
+    batches = [[rows[i] for i in b] for b in length_batches(lengths, cfg["max_items"], cfg["max_frames"])]
+    if rng is not None:
+        rng.shuffle(batches)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pending = pool.submit(_load_batch, features.store, batches[0]) if batches else None
+        for nxt in batches[1:] + [None]:
+            batch = pending.result()
+            pending = pool.submit(_load_batch, features.store, nxt) if nxt is not None else None
+            yield batch
+
+
+def _encode(transcripts, vocab):
+    ids = [[vocab.get(c, vocab["<unk>"]) for c in t] for t in transcripts]
+    return torch.tensor([i for t in ids for i in t], dtype=torch.long), torch.tensor([len(t) for t in ids])
+
+
+def greedy_decode(log_probs, lengths, vocab):
     inv_vocab = {v: k for k, v in vocab.items()}
     blank = vocab["<blank>"]
-    preds = log_probs.argmax(dim=-1)  # (B,T)
+    preds = log_probs.argmax(dim=-1).cpu()
     results = []
     for b in range(preds.shape[0]):
-        length = int(frame_mask[b].sum().item())
         collapsed, prev = [], None
-        for t in preds[b, :length].cpu().tolist():
+        for t in preds[b, :int(lengths[b])].tolist():
             if t != prev and t != blank:
                 collapsed.append(t)
             prev = t
@@ -116,31 +108,50 @@ def greedy_decode(log_probs, frame_mask, vocab):
 
 
 @torch.no_grad()
-def evaluate_ctc(upstream, head, test_ds, vocab, params):
-    head.eval()
-    all_refs, all_hyps = [], []
-    for batch_idx in iterate_batches(len(test_ds), params["batch_size"], shuffle=False, rng=None):
-        waveforms, transcripts = load_items(test_ds, batch_idx)
-        for sub in split_by_budget(waveforms, params["batch_size"], MAX_BATCH_SAMPLE_BUDGET):
-            sub_waveforms = [waveforms[j] for j in sub]
-            hidden_states, frame_mask = upstream.extract(sub_waveforms)
-            log_probs = head(hidden_states)
-            all_hyps.extend(greedy_decode(log_probs, frame_mask, vocab))
-            all_refs.extend(transcripts[j] for j in sub)
+def transcribe(model, features, rows, cfg):
+    model.eval()
+    hyps = {}
+    for batch_rows, x, lengths in _batches(features, rows, cfg):
+        log_probs = model(x.to(features.device).float(), lengths)
+        for r, h in zip(batch_rows, greedy_decode(log_probs, lengths, features.vocab)):
+            hyps[r] = h
+    refs = [features.transcripts[r] for r in rows]
     # jiwer chokes on empty strings; substitute a single space (counts as one error).
-    all_refs = [r if r.strip() else " " for r in all_refs]
-    all_hyps = [h if h.strip() else " " for h in all_hyps]
-    return metrics.wer(all_refs, all_hyps), metrics.cer(all_refs, all_hyps)
+    return ([r if r.strip() else " " for r in refs],
+            [hyps[r] if hyps[r].strip() else " " for r in rows])
 
 
-def run(upstream, spec, params, seed=42):
-    train_ds, test_ds, vocab, split_type = load_asr_task(spec, seed=seed)
-    reset_peak_memory(upstream.device)
-    start = time.time()
-    head = train_ctc_probe(upstream, train_ds, vocab, params, seed=seed)
-    train_seconds = time.time() - start
-    wer, cer = evaluate_ctc(upstream, head, test_ds, vocab, params)
-    n_steps = params["epochs"] * max(1, -(-len(train_ds) // params["batch_size"]))
-    metrics_out = {"wer": wer, "cer": cer}
-    perf = {"seconds_per_step": train_seconds / n_steps, "peak_gpu_gb": peak_gpu_gb(upstream.device)}
-    return metrics_out, perf, head, split_type
+def run(features, params, seed, tuned):
+    cfg = params["asr"]
+    device = features.device
+    train, dev, test = features.rows("train"), features.rows("dev"), features.rows("test")
+    num_layers, _, hidden = features.store.load(0, mmap=True).shape
+    ctc_loss = nn.CTCLoss(blank=features.vocab["<blank>"], zero_infinity=True)
+
+    def build():
+        return BLSTMCTCHead(num_layers, hidden, len(features.vocab), cfg["hidden_size"], cfg["rnn_layers"],
+                            cfg["dropout"]).to(device)
+
+    def train_epoch(model, optimizer, rng):
+        for batch_rows, x, lengths in _batches(features, train, cfg, rng):
+            targets, target_lengths = _encode([features.transcripts[r] for r in batch_rows], features.vocab)
+            log_probs = model(x.to(device).float(), lengths)
+            loss = ctc_loss(log_probs.transpose(0, 1), targets.to(device), lengths.to(device),
+                            target_lengths.to(device))
+            optimizer.zero_grad()
+            loss.backward()
+            nn.utils.clip_grad_norm_(model.parameters(), cfg["grad_clip"])
+            optimizer.step()
+
+    def dev_cer(model):
+        return metrics.cer(*transcribe(model, features, dev, cfg))
+
+    reset_peak_memory(device)
+    fit = fit_with_dev(build, train_epoch, dev_cer, learning_rates(cfg, tuned), cfg["max_epochs"],
+                       cfg["patience"], seed, maximize=False, verbose=True)
+    tuned.setdefault("lr", fit.lr)
+    refs, hyps = transcribe(fit.model, features, test, cfg)
+    metrics_out = {"wer": metrics.wer(refs, hyps), "cer": metrics.cer(refs, hyps)}
+    perf = {"train_seconds": fit.train_seconds, "peak_gpu_gb": peak_gpu_gb(device)}
+    details = {"lr": fit.lr, "best_epoch": fit.best_epoch, "dev_cer": fit.dev_score}
+    return metrics_out, perf, features.split["split_type"], details

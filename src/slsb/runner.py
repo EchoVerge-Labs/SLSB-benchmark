@@ -6,16 +6,18 @@ Never fabricates a value: a task that errors (including speaker diarization,
 which has no runner yet -- see tasks/speaker_diarization.py) is recorded with
 status="skipped"/"error" and a reason, not a guessed score.
 """
+import shutil
 import time
 from pathlib import Path
 
 import torch
 
-from slsb.tasks import FAMILY_DIR_PREFIXES, FAMILY_MODULES
+from slsb.tasks import EXCLUDED_TASK_DIRS, FAMILY_DIR_PREFIXES, FAMILY_MODULES
+from slsb.tasks._common import set_seed
 from slsb.tasks.speaker_diarization import discover as discover_diarization
 from slsb.upstream.loader import load_upstream
 from slsb.utils import mlflow_logger
-from slsb.utils.datasets import discover_tasks, find_unrecognized_dirs, load_verification_task
+from slsb.utils.datasets import discover_tasks, find_unrecognized_dirs
 from slsb.utils.params import load_params
 
 DIARIZATION_LANGS = ("sinhala", "tamil")
@@ -24,14 +26,15 @@ DIARIZATION_LANGS = ("sinhala", "tamil")
 def matching_dirs(data_dir: Path, family: str) -> list[str]:
     """Directory names under data_dir that belong to the given task family,
     found by name prefix (data/<prefix>*) -- works even for families like
-    "sd" that discover_tasks() doesn't recognize (RTTM-only, no label file)."""
+    "sd" that discover_tasks() doesn't recognize (RTTM-only, no label file).
+    Folders in EXCLUDED_TASK_DIRS are left out."""
     data_dir = Path(data_dir)
     if not data_dir.exists():
         return []
     prefixes = FAMILY_DIR_PREFIXES[family]
     return sorted(
         entry.name for entry in data_dir.iterdir()
-        if entry.is_dir() and entry.name.startswith(prefixes)
+        if entry.is_dir() and entry.name.startswith(prefixes) and entry.name not in EXCLUDED_TASK_DIRS
     )
 
 
@@ -42,35 +45,14 @@ def validate_tasks_exist(data_dir: Path, families: list[str]) -> dict:
     return missing
 
 
-def _sort_key(spec):
-    # sid must run before asv_* within the same upstream/seed: ASV reuses SID's trained head.
-    is_sid = spec.kind == "classification" and spec.task == "sid"
-    return (0 if is_sid else 1, spec.name)
-
-
-def _run_one(upstream, spec, params, seed, sid_head_cache):
+def family_of(spec) -> str:
     if spec.kind == "asr":
-        metrics_out, perf, _head, split_type = FAMILY_MODULES["asr"].run(upstream, spec, params, seed=seed)
-        return metrics_out, perf, split_type
-
-    if spec.kind == "classification" and spec.task == "sid":
-        metrics_out, perf, head, split_type = FAMILY_MODULES["sid"].run(upstream, spec, params, seed=seed)
-        sid_head_cache[seed] = head
-        return metrics_out, perf, split_type
-
-    if spec.kind == "classification" and spec.task == "er":
-        metrics_out, perf, _head, split_type, _diag = FAMILY_MODULES["er"].run(upstream, spec, params, seed=seed)
-        return metrics_out, perf, split_type
-
+        return "asr"
     if spec.kind == "verification":
-        sid_head = sid_head_cache.get(seed)
-        if sid_head is None:
-            raise RuntimeError("no trained SID head available for this seed yet (sid task must run first)")
-        trials = load_verification_task(spec)
-        metrics_out, perf = FAMILY_MODULES["asv"].run(upstream, trials, sid_head, params)
-        return metrics_out, perf, "random"
-
-    raise ValueError(f"unknown task kind: {spec.kind}")
+        return "asv"
+    if spec.kind == "classification" and spec.task in ("sid", "er"):
+        return spec.task
+    raise ValueError(f"no runner for task {spec.name} (kind {spec.kind})")
 
 
 def run_benchmark(upstream_name: str, families: list[str], data_dir: Path, seeds: list[int],
@@ -86,7 +68,7 @@ def run_benchmark(upstream_name: str, families: list[str], data_dir: Path, seeds
 
     all_specs = discover_tasks(data_dir)
     wanted_dirnames = {d for family in families for d in matching_dirs(data_dir, family)}
-    specs = sorted((s for s in all_specs if s.task_dir.name in wanted_dirnames), key=_sort_key)
+    specs = sorted((s for s in all_specs if s.task_dir.name in wanted_dirnames), key=lambda s: s.name)
 
     unrecognized = find_unrecognized_dirs(data_dir)
     run_diarization = "sd" in families
@@ -99,30 +81,56 @@ def run_benchmark(upstream_name: str, families: list[str], data_dir: Path, seeds
 
     upstream = load_upstream(upstream_name, device)
     results = []
+    feature_root = out_dir / ".features"
+    shared_by_family = {}
 
-    for seed in seeds:
-        print(f"\n=== seed: {seed} ===")
-        sid_head_cache = {}
+    # Task-major: each task's features are extracted once and reused by every
+    # seed (the upstream is frozen, so they are identical), then deleted.
+    for spec in specs:
+        family = family_of(spec)
+        module = FAMILY_MODULES[family]
+        print(f"\n--- {spec.name} ({spec.kind}) ---", flush=True)
+        start = time.time()
+        try:
+            prepared = module.prepare(upstream, spec, params, feature_root / spec.name,
+                                      shared_by_family.setdefault(family, {}))
+            feature_seconds = time.time() - start
+            print(f"    features ready ({feature_seconds:.0f}s)", flush=True)
+        except Exception as e:
+            print(f"    FAILED preparing features: {e}")
+            prepared, feature_seconds = None, None
+            error = str(e)
 
-        for spec in specs:
-            print(f"--- {spec.name} ({spec.kind}) ---", flush=True)
+        tuned = {}  # learning rates picked on dev by the first seed
+        for seed in seeds:
             entry = {"upstream": upstream_name, "task": spec.task, "language": spec.lang,
-                      "name": spec.name, "kind": spec.kind, "seed": seed}
+                     "name": spec.name, "kind": spec.kind, "seed": seed}
             try:
-                start = time.time()
-                metrics_out, perf, split_type = _run_one(upstream, spec, params, seed, sid_head_cache)
-                elapsed = time.time() - start
-                print(f"    {metrics_out}  perf={perf}  split={split_type}  (wall {elapsed:.1f}s)")
+                if prepared is None:
+                    raise RuntimeError(error)
+                print(f"  seed {seed}", flush=True)
+                set_seed(seed)
+                metrics_out, perf, split_type, details = module.run(prepared, params, seed, tuned)
+                perf["feature_seconds"] = feature_seconds
+                print(f"    {metrics_out}  split={split_type}  {details}", flush=True)
                 mlflow_logger.log_run(csv_path, upstream_name, spec.task, spec.lang, seed=seed,
-                                       metrics=metrics_out, perf=perf, split=split_type,
-                                       mlflow_uri=mlflow_uri, repo_root=Path.cwd())
-                entry.update(status="ok", split=split_type, metrics=metrics_out, perf=perf)
+                                      metrics=metrics_out, perf=perf, split=split_type, details=details,
+                                      mlflow_uri=mlflow_uri, repo_root=Path.cwd())
+                entry.update(status="ok", split=split_type, metrics=metrics_out, perf=perf, details=details)
             except Exception as e:
                 print(f"    FAILED: {e}")
                 mlflow_logger.log_skipped(csv_path, upstream_name, spec.task, spec.lang)
                 entry.update(status="error", error=str(e))
             results.append(entry)
+        if prepared is not None:
+            prepared.cleanup()
 
+    for shared in shared_by_family.values():
+        for cleanup in shared.get("cleanup", []):
+            cleanup()
+    shutil.rmtree(feature_root, ignore_errors=True)
+
+    for seed in seeds:
         if run_diarization:
             for lang in DIARIZATION_LANGS:
                 if f"sd_{lang}" not in wanted_dirnames:

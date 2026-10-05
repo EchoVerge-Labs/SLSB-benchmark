@@ -1,0 +1,194 @@
+"""v0.2 protocol pieces on synthetic inputs: splits, batching, heads, model
+selection. CPU only; no audio, no upstream, no network."""
+import csv
+import importlib.util
+import json
+from pathlib import Path
+
+import pytest
+import torch
+
+from slsb.features import length_batches
+from slsb.tasks._common import WeightedSum, fit_utterance_head, fit_with_dev, learning_rates
+from slsb.tasks.asr import BLSTMCTCHead, greedy_decode
+from slsb.tasks.speaker_verification import AMSoftmax, XVector
+from slsb.utils.datasets import TaskSpec
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _load_make_splits():
+    spec = importlib.util.spec_from_file_location("make_splits", REPO_ROOT / "data_prep" / "make_splits.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+make_splits = _load_make_splits()
+
+
+def _write_csv(path, header, rows):
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(rows)
+
+
+def _spec(task_dir, name, task, kind, label_file):
+    return TaskSpec(name=name, task=task, lang="x", kind=kind, task_dir=task_dir,
+                    audio_dir=task_dir / "audio", label_path=task_dir / label_file)
+
+
+def test_length_batches_cover_everything_within_budget():
+    lengths = [5, 100, 30, 30, 7, 64, 1, 99]
+    batches = length_batches(lengths, max_items=3, max_padded=150)
+    assert sorted(i for b in batches for i in b) == list(range(len(lengths)))
+    for b in batches:
+        assert len(b) <= 3
+        assert len(b) == 1 or max(lengths[i] for i in b) * len(b) <= 150
+
+
+def test_weighted_sum_contracts_the_layer_axis():
+    ws = WeightedSum(4)
+    assert torch.allclose(ws.layer_weights().sum(), torch.tensor(1.0))
+    x = torch.randn(2, 4, 8)  # (B, L, H)
+    assert ws(x, dim=1).shape == (2, 8)
+    assert torch.allclose(ws(x, dim=1), x.mean(dim=1), atol=1e-6)  # zero init = uniform mix
+
+
+def test_fit_with_dev_keeps_the_best_epoch_and_lr():
+    # A model whose "dev score" is a parameter we push around per epoch.
+    def build():
+        return torch.nn.Linear(1, 1, bias=False)
+
+    def train_epoch(model, optimizer, rng):
+        with torch.no_grad():
+            model.weight += optimizer.param_groups[0]["lr"]
+
+    def dev_score(model):  # peaks at init + 0.75: epoch 3 of lr 0.25; lr 0.1 can only get within 0.05
+        return -abs(float(model.weight) - (init + 0.75))
+
+    torch.manual_seed(0)
+    init = float(build().weight.detach())
+    fit = fit_with_dev(build, train_epoch, dev_score, lrs=[0.1, 0.25], max_epochs=10, patience=2, seed=0,
+                       maximize=True)
+    assert fit.lr == 0.25 and fit.best_epoch == 3
+    assert float(fit.model.weight) == pytest.approx(init + 0.75)
+
+
+def test_learning_rates_grid_then_reuse():
+    cfg = {"lr_grid": [1e-2, 1e-3]}
+    tuned = {}
+    assert learning_rates(cfg, tuned) == [1e-2, 1e-3]
+    tuned["lr"] = 1e-3
+    assert learning_rates(cfg, tuned) == [1e-3]
+
+
+def test_utterance_head_learns_separable_classes():
+    torch.manual_seed(0)
+    y = torch.arange(3).repeat(40)
+    x = torch.randn(len(y), 4, 6) * 0.1
+    x[torch.arange(len(y)), :, y] += 2.0  # class c lights up feature c in every layer
+    cfg = {"batch_size": 16, "max_epochs": 50, "patience": 5}
+    fit = fit_utterance_head(x[:90], y[:90], x[90:], y[90:], 3, cfg, [1e-2], seed=0)
+    assert fit.dev_score == 1.0
+
+
+def test_blstm_ctc_head_shapes_and_greedy_decode():
+    head = BLSTMCTCHead(num_layers=3, input_size=8, vocab_size=5, hidden_size=4, rnn_layers=2, dropout=0.0)
+    out = head(torch.randn(3, 2, 7, 8), torch.tensor([7, 4]))
+    assert out.shape == (2, 7, 5)
+    assert torch.allclose(out.exp().sum(-1), torch.ones(2, 7), atol=1e-5)
+    vocab = {"<blank>": 0, "<unk>": 1, " ": 2, "a": 3, "b": 4}
+    log_probs = torch.full((1, 6, 5), -10.0)
+    for t, c in enumerate([3, 3, 0, 3, 4, 4]):  # a a _ a b b -> "aab"
+        log_probs[0, t, c] = 0.0
+    assert greedy_decode(log_probs, torch.tensor([6]), vocab) == ["aab"]
+
+
+def test_xvector_and_am_softmax():
+    model = XVector(input_size=8, channels=16, stats_channels=32, embedding_size=12)
+    emb = model(torch.randn(4, 50, 8))
+    assert emb.shape == (4, 12)
+    loss_fn = AMSoftmax(12, num_classes=3, margin=0.4, scale=30.0)
+    labels = torch.tensor([0, 1, 2, 0])
+    with_margin = loss_fn(emb, labels)
+    loss_fn.margin = 0.0
+    assert with_margin > loss_fn(emb, labels)  # the margin only ever makes the target harder
+
+
+def test_asr_split_is_speaker_disjoint_and_replaces_a_leaky_v1_split(tmp_path):
+    task_dir = tmp_path / "asr_x"
+    task_dir.mkdir()
+    files = [f"u{i:03d}.wav" for i in range(200)]
+    _write_csv(task_dir / "transcripts.csv", ["filename", "transcript"], [(f, "t") for f in files])
+    _write_csv(task_dir / "speakers.csv", ["filename", "speaker"], [(f, f"s{i % 40}") for i, f in enumerate(files)])
+    # v0.1-style random split: shares speakers, so it must not be reused.
+    (task_dir / "split_transcripts.json").write_text(json.dumps({"train": files[:160], "test": files[160:]}))
+    split = make_splits.asr_split(_spec(task_dir, "asr_x", "asr", "asr", "transcripts.csv"))
+    speaker = {f: f"s{i % 40}" for i, f in enumerate(files)}
+    parts = [{speaker[f] for f in split[p]} for p in ("train", "dev", "test")]
+    assert not (parts[0] & parts[1]) and not (parts[0] & parts[2]) and not (parts[1] & parts[2])
+    assert sorted(split["train"] + split["dev"] + split["test"]) == files
+    assert split["diagnostics"]["test_set"].startswith("new")
+
+
+def test_er_folds_are_speaker_disjoint(tmp_path):
+    task_dir = tmp_path / "er_x"
+    task_dir.mkdir()
+    rows = [(f"{s:02d}_{n:02d}_{e}.wav", e) for s in range(10) for n in range(3) for e in ("ang", "hap")]
+    _write_csv(task_dir / "labels.csv", ["filename", "label"], rows)
+    split = make_splits.kfold_split(_spec(task_dir, "er_x", "er", "classification", "labels.csv"))
+    speakers = [{f.split("_")[0] for f in fold} for fold in split["folds"]]
+    assert len(speakers) == 5
+    assert all(not (a & b) for i, a in enumerate(speakers) for b in speakers[i + 1:])
+    assert sum(len(f) for f in split["folds"]) == len(rows)
+
+
+def test_asv_split_holds_out_dev_speakers_with_balanced_trials(tmp_path):
+    asv_dir = tmp_path / "asv"
+    asv_dir.mkdir()
+    rows = [(f"{lang}/{lang[0]}{s}/c{c}.wav", f"{lang[0]}{s}")
+            for lang in ("sinhala", "tamil") for s in range(20) for c in range(5)]
+    _write_csv(asv_dir / "train_labels.csv", ["filename", "label"], rows)
+    split = make_splits.asv_split(asv_dir)
+    speaker = dict(rows)
+    train_speakers = {speaker[f] for f in split["train"]}
+    dev_speakers = {speaker[f] for f in split["dev"]}
+    assert dev_speakers and not (train_speakers & dev_speakers)
+    labels = [t[0] for t in split["dev_trials"]]
+    assert labels.count(1) == labels.count(0)
+    for label, a, b in split["dev_trials"]:
+        assert a in split["dev"] and b in split["dev"]
+        assert (speaker[a] == speaker[b]) == (label == 1)
+
+
+def test_epochs_override_caps_every_head(monkeypatch):
+    from slsb.utils.params import load_params
+    monkeypatch.setenv("SLSB_EPOCHS_OVERRIDE", "2")
+    params = load_params(REPO_ROOT / "params.yaml")
+    assert params["utterance"]["max_epochs"] == 2
+    assert params["asr"]["max_epochs"] == 2
+    assert params["asv"]["max_epochs"] == 2 and params["asv"]["layer_mix"]["max_epochs"] == 2
+
+
+def test_greedy_decode_skips_padding():
+    vocab = {"<blank>": 0, "<unk>": 1, " ": 2, "a": 3}
+    log_probs = torch.full((1, 4, 4), -10.0)
+    log_probs[0, :, 3] = 0.0
+    assert greedy_decode(log_probs, torch.tensor([1]), vocab) == ["a"]
+
+
+def test_excluded_task_dirs_are_not_run(tmp_path):
+    from slsb.runner import matching_dirs
+    for name in ("asr_sinhala", "asr_tamil", "asr_omni_sinhala"):
+        (tmp_path / name).mkdir()
+    assert matching_dirs(tmp_path, "asr") == ["asr_sinhala", "asr_tamil"]
+
+
+def test_stats_pooling_head():
+    from slsb.tasks.speaker_verification import SpeakerModel
+    model = SpeakerModel(8, num_speakers=3, cfg={"head": "stats", "embedding_size": 6, "margin": 0.4, "scale": 30.0})
+    emb = model.encoder(torch.randn(4, 30, 8))
+    assert emb.shape == (4, 6)
+    assert model.loss(emb, torch.tensor([0, 1, 2, 0])).ndim == 0

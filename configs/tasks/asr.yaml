@@ -1,10 +1,11 @@
 family: asr
 kind: asr
-data_dirs: [asr_sinhala, asr_tamil, asr_omni_sinhala]
+data_dirs: [asr_sinhala, asr_tamil]  # asr_omni_sinhala EXCLUDED (single speaker), see KNOWN_ISSUES.md
 languages: [sinhala, tamil]
 primary_metric: wer
 secondary_metrics: [cer]
-head: ctc  # WeightedSum + linear -> CTC (slsb.tasks.asr.CTCHead)
+head: blstm_ctc  # WeightedSum + 2-layer BiLSTM + CTC (slsb.tasks.asr.BLSTMCTCHead)
+split: speaker_disjoint  # train/dev/test
 notes: >
-  Audio is never truncated (would desync transcript from audio); long clips are
-  sub-batched by a sample budget instead (see MAX_BATCH_SAMPLE_BUDGET).
+  Audio is never cropped (would desync transcript from audio). Every layer's
+  frames are extracted once and the head trains on them; selected on dev CER.

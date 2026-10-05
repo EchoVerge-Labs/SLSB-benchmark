@@ -1,5 +1,49 @@
-seed: 42
-batch_size: 16
-lr: 0.001
-epochs: 10
-layers: all
+# SLSB v0.2 protocol: downstream-head settings. Splits live with the data
+# (data/*/split_v2.json, written by data_prep/make_splits.py).
+#
+# Every head is selected on the dev split: each learning rate in lr_grid is
+# trained with early stopping (patience epochs without a dev improvement, at
+# most max_epochs), and the best dev score wins. The grid is searched on the
+# first run seed only; later seeds reuse the learning rate it picked.
+
+# SID, ER: weighted sum over layers + mean-pool + linear (SUPERB).
+utterance:
+  batch_size: 32
+  lr_grid: [1.0e-2, 1.0e-3, 1.0e-4]
+  max_epochs: 200
+  patience: 20
+
+# ASR: weighted sum + 2-layer BiLSTM + CTC over characters (SUPERB), greedy decoding.
+asr:
+  hidden_size: 1024        # per direction
+  rnn_layers: 2
+  dropout: 0.2
+  max_items: 32            # clips per batch
+  max_frames: 12000        # padded frames per batch (~4 min of audio)
+  grad_clip: 1.0
+  lr_grid: [1.0e-3, 1.0e-4]
+  max_epochs: 60
+  patience: 8
+
+# ASV: speaker-embedding head + AM-softmax on SLCeleb dev speakers, cosine scoring,
+# selected on dev EER. head: stats (mean+std pooling -> linear) won on dev over
+# SUPERB's x-vector, which overfits 125 speakers in 1-2 epochs (see
+# tasks/speaker_verification.py); head: xvector restores it.
+asv:
+  head: stats
+  embedding_size: 256
+  margin: 0.4
+  scale: 30.0
+  crop_frames: 200         # 4 s training crops
+  batch_size: 64
+  lr_grid: [1.0e-3, 1.0e-4]
+  max_epochs: 40
+  patience: 6
+  # The layer mix the x-vector reads, from a mean-pool speaker classifier on a
+  # subset of the training clips (see tasks/speaker_verification.py).
+  layer_mix_clips_per_speaker: 30
+  layer_mix:
+    batch_size: 32
+    lr_grid: [1.0e-3]
+    max_epochs: 100
+    patience: 10

@@ -3,7 +3,9 @@ kind: verification
 data_dirs: [asv]
 languages: [sinhala, tamil]  # trials_sinhala.csv, trials_tamil.csv inside data/asv/
 primary_metric: eer
-head: reused_from_sid  # no separate ASV training set; embeds trial pairs with SID's trained head
+head: stats_pooling_amsoftmax  # slsb.tasks.speaker_verification; params.yaml asv.head
+training_data: asv/train_labels.csv  # SLCeleb dev speakers, none of them in the trials
 notes: >
-  Requires sid to have run first for the same upstream/seed (slsb.runner enforces
-  this ordering). Score is cosine-similarity EER over held-out trial pairs.
+  Trained on speakers disjoint from the trial lists, selected on dev trials from
+  held-out training speakers, scored by cosine-similarity EER. The layer mix is
+  fixed first from a mean-pool speaker classifier (see README "Protocol").

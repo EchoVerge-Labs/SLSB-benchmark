@@ -27,23 +27,13 @@ def test_cli_run_requires_args():
         assert e.code != 0
 
 
-def test_defaults_yaml_valid():
-    defaults = yaml.safe_load((REPO_ROOT / "configs" / "defaults.yaml").read_text())
-    assert "downstream_head" in defaults
-    assert "training" in defaults
-    assert "evaluation" in defaults
-    assert defaults["evaluation"]["frozen_upstream"] is True
-    assert defaults["evaluation"]["weighted_sum"] is True
-    assert defaults["downstream_head"]["pooling"] == "mean"
-
-
 def test_params_yaml_valid():
     params = yaml.safe_load((REPO_ROOT / "params.yaml").read_text())
-    for key in ("seed", "batch_size", "lr", "epochs"):
-        assert key in params, f"params.yaml missing required key: {key}"
-    assert isinstance(params["epochs"], int) and params["epochs"] > 0
-    assert isinstance(params["batch_size"], int) and params["batch_size"] > 0
-    assert isinstance(params["lr"], float) and params["lr"] > 0
+    for section in ("utterance", "asr", "asv"):
+        cfg = params[section]
+        assert cfg["lr_grid"] and all(isinstance(lr, float) and lr > 0 for lr in cfg["lr_grid"])
+        assert isinstance(cfg["max_epochs"], int) and cfg["max_epochs"] > 0
+        assert isinstance(cfg["patience"], int) and cfg["patience"] > 0
 
 
 def test_task_family_registry_matches_configs():

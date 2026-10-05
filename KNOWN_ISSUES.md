@@ -22,22 +22,41 @@ raises `NotImplementedError` by design; `slsb run --tasks sd` records each
 a DER score. Building the runner (embedding extraction + clustering + DER
 scoring, e.g. via `pyannote.metrics`) is unstarted.
 
+## `asr_omni_sinhala` — excluded from v0.2 (single speaker)
+
+All 111 clips come from one speaker, so no split can be speaker-disjoint: any
+score would be a speaker-dependent test, not comparable with `asr_sinhala` /
+`asr_tamil`. It is listed in `slsb.tasks.EXCLUDED_TASK_DIRS`, so `slsb run`
+skips it; its data stays in `data/` (DVC-tracked, used by v0.1 results).
+`data_prep/make_splits.py` still writes a `single_speaker_random` split for it,
+in case it is ever re-enabled.
+
+## ASV: few training speakers, and dev doesn't track test closely
+
+ASV trains on 125 speakers (SUPERB's VoxCeleb1 has ~1,200), which is why
+SUPERB's x-vector overfits here and a statistics-pooling head is used instead
+(README "Protocol"). Its layer mix is fixed before the head trains, because
+every layer's frames for ~45 h of training audio would not fit on disk.
+
+Dev EER (14 held-out speakers) ranks heads less reliably than one would like:
+across the heads tried, test EER on the two trial lists moved in different
+directions from dev. More SLCeleb speakers -- or a larger dev set -- would make
+ASV selection more trustworthy. Tamil test EER also varies more across seeds
+(~±0.02) than the other tasks.
+
+## No benchmark/pre-training contamination check yet
+
+Nothing here verifies that a benchmark test clip was never in an upstream's
+pre-training audio. SLCeleb (ASV/SID) is YouTube audio, so a continued-pretraining
+corpus built from YouTube could contain the same videos. An audio-fingerprint
+check against each pre-training set is still to be built.
+
 ## Task status summary
 
 | Task family | Status |
 |---|---|
-| `asr` | fully validated |
-| `sid` | fully validated |
-| `asv` | fully validated (depends on `sid` running first) |
-| `er` | validated on `er_tamil` only, using the leakage-free split (see `slsb.utils.datasets.load_classification_task_leakage_free`); plain random split is known to leak speaker/sentence identity |
+| `asr` | validated on `asr_sinhala`, `asr_tamil`; `asr_omni_sinhala` excluded (see above) |
+| `sid` | validated (closed set) |
+| `asv` | validated (speaker-disjoint from its trials) |
+| `er` | validated on `er_tamil` only (speaker-disjoint 5-fold) |
 | `sd` | in progress — data staged, no evaluator |
-
-## `configs/defaults.yaml` vs. the current training loop
-
-`configs/defaults.yaml` documents the intended SUPERB-style downstream-head
-protocol. The current probe/CTC heads (`slsb/tasks/_common.py`,
-`slsb/tasks/asr.py`) implement `frozen_upstream`, `weighted_sum`, and
-`pooling: mean` as specified, but are a single linear layer trained with plain
-Adam for a fixed epoch count from `params.yaml` — `hidden_dim`, `num_layers`,
-`dropout`, `scheduler`, `warmup_ratio`, and `early_stopping_patience` from
-`defaults.yaml` are not yet wired into the training loop.

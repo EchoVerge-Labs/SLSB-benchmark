@@ -2,16 +2,16 @@
 
 A frozen-upstream, SUPERB-style benchmark for comparing self-supervised speech
 encoders on Sinhala and Sri Lankan Tamil tasks: the upstream encoder is always
-kept frozen, and only a lightweight learned-weighted-sum + linear head is
-trained per task, so results isolate what the upstream's representations
-actually capture rather than how well a big downstream model can compensate.
+kept frozen, and only a learned weighted sum over its layers plus a standard
+per-task downstream head is trained, so results reflect what the upstream's
+representations capture.
 
 ## Installation
 
 ```bash
 pip install -e .
 # or
-pip install git+https://github.com/EchoVerge-Labs/SLSB-benchmark.git@v0.1.0
+pip install git+https://github.com/EchoVerge-Labs/SLSB-benchmark.git@v0.2.0
 ```
 
 For development (linting + tests):
@@ -47,17 +47,69 @@ See `make benchmark` for a minimal example.
 
 | Family | Data dir(s) | Language(s) | Kind | Primary metric | Status |
 |---|---|---|---|---|---|
-| `asr` | `asr_sinhala`, `asr_tamil`, `asr_omni_sinhala` | Sinhala, Tamil | ASR (CTC) | WER | validated |
+| `asr` | `asr_sinhala`, `asr_tamil` | Sinhala, Tamil | ASR (CTC) | WER (+ CER) | validated |
 | `sid` | `sid` | multilingual | classification | accuracy | validated |
-| `asv` | `asv` | Sinhala, Tamil (trial pairs) | verification | EER | validated (depends on `sid`) |
-| `er` | `er_tamil` | Tamil | classification | accuracy | validated (leakage-free split) |
+| `asv` | `asv` | Sinhala, Tamil (trial pairs) | verification | EER | validated |
+| `er` | `er_tamil` | Tamil | classification | accuracy | validated (speaker-disjoint 5-fold) |
 | `sd` | `sd_sinhala`, `sd_tamil` | Sinhala, Tamil | diarization | DER | **not implemented** — see below |
 
+`asr_omni_sinhala` is **not run** from v0.2 (one speaker; see below).
 `er_sinhala` is **excluded** from this repo's data pending dataset-quality
 fixes upstream. `sd_*` data is staged (wav + RTTM pairs) but has no DER
 evaluator yet; `slsb run --tasks sd` reports each combo as `skipped` rather
 than fabricating a score. See [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) for detail
 on both.
+
+## Protocol (v0.2)
+
+Scores from different protocol versions are not comparable; each MLflow run
+records `protocol` and `slsb_version`.
+
+| Task | Downstream head | Split (`data/<task>/split_v2.json`) | Selected on |
+|---|---|---|---|
+| ASR | weighted sum + 2-layer BiLSTM (1024/direction) + CTC over characters, greedy decoding | speaker-disjoint train/dev/test, 70/10/20 | dev CER |
+| SID | weighted sum + mean-pool + linear | closed set (every speaker is a class), stratified train/dev/test | dev accuracy |
+| ER | weighted sum + mean-pool + linear | speaker-disjoint 5-fold cross-validation; per fold, the next fold is dev; mean over folds | dev accuracy |
+| ASV | weighted sum + mean/std statistics pooling + linear embedding, AM-softmax, cosine scoring | trained on 125 SLCeleb dev speakers, selected on dev trials from 14 more; tested on the trial lists, whose speakers it never sees | dev EER |
+
+- **Model selection:** every head is trained per learning rate in `params.yaml`'s
+  `lr_grid`, with early stopping on the dev split. The grid is searched on the
+  first run seed; later seeds reuse the learning rate it picked. The test split
+  is scored once, at the end.
+- **Seeds** vary the head's initialisation and batch order. The splits are fixed
+  data, the same for every seed and every upstream.
+- **Features are extracted once per task.** The upstream is frozen, so its
+  hidden states are cached (`<out>/.features/`, deleted when the task finishes)
+  and every epoch, learning rate and seed trains on them.
+- **ASV departs from SUPERB twice.** (1) Its head is statistics pooling, not
+  SUPERB's x-vector: with 125 training speakers the x-vector overfits within
+  1-2 epochs (dev EER ~0.17), while statistics pooling reaches ~0.12 and is far
+  more stable across seeds -- chosen on dev EER, never on test. (2) Storing
+  every layer's frames for ~45 h of training audio is too large, so the layer
+  weights are fixed first, from a mean-pool speaker classifier on a subset of
+  the training speakers.
+- `asr_omni_sinhala` is excluded: it has a single speaker, so it can't be
+  split speaker-disjointly (its data stays in `data/`; see KNOWN_ISSUES.md).
+
+### What changed from v0.1
+
+v0.1 trained one linear layer for a fixed 10 epochs with no dev set, and:
+- `asv` trained its embedding (SID's head) on the same 79 speakers and clips its
+  trials test;
+- `asr_sinhala`'s split was random: all 600 test clips came from speakers also
+  in training;
+- `er_tamil` was scored on a single split of 936 clips;
+- a task's split was cached on first use, so run seeds never changed it.
+
+### Building the v0.2 data
+
+On top of the v0.1 data:
+
+```bash
+python data_prep/prep_asr_sinhala_speakers.py   # data/asr_sinhala/speakers.csv
+python data_prep/prep_slceleb_train.py          # data/asv/train_audio/ + train_labels.csv
+python data_prep/make_splits.py                 # data/*/split_v2.json
+```
 
 ## Dataset
 
@@ -73,5 +125,5 @@ dvc pull
 src/slsb/        installable package (cli, runner, tasks/, upstream/, metrics/, utils/)
 configs/         defaults.yaml + per-task-family configs/tasks/*.yaml
 data_prep/       scripts that built data/ from upstream sources (see each script's docstring)
-tests/           smoke tests (import + config validation, no GPU/data needed)
+tests/           smoke + protocol tests (no GPU, data or network needed)
 ```
