@@ -4,9 +4,12 @@ TRAINING data from the SLCeleb archive's dev split.
 
 The ASV trial lists (data/asv/trials_*.csv) cover every clip and speaker in
 data/asv/audio/, so nothing there can train a speaker-embedding model without
-testing on speakers it has seen. SLCeleb's dev split holds other speakers;
-any dev speaker id that also appears in the trials is dropped, so training and
-test speakers are disjoint.
+testing on speakers it has seen. SLCeleb's dev split holds other speaker ids --
+but not always other speakers: the archive's sinhala/dev clips are byte-for-byte
+copies of test clips filed under different ids. So a dev speaker is dropped if
+its id appears in the trials OR any of its clips is identical to a test clip,
+and clips whose audio is filed under more than one speaker are dropped too. In
+practice this keeps the 89 Tamil dev speakers and none of the Sinhala ones.
 
 Speakers are capped at MAX_CLIPS_PER_SPEAKER clips (a fixed random subset) so a
 few very prolific Tamil speakers don't dominate training, and to bound the
@@ -15,6 +18,7 @@ per-upstream feature-extraction cost.
 Idempotent: wavs already converted on disk are not reconverted.
 """
 import csv
+import hashlib
 import io
 import random
 import sys
@@ -51,10 +55,23 @@ def trial_speakers() -> set[str]:
     return speakers
 
 
+def audio_digest(source) -> str:
+    """md5 of the decoded 16-bit samples, so a re-written file with a different
+    header still matches its original."""
+    data, _ = sf.read(source, dtype="int16")
+    return hashlib.md5(data.tobytes()).hexdigest()
+
+
+def test_audio_hashes() -> set[str]:
+    """Digests of every clip the trials can use (data/asv/audio/)."""
+    return {audio_digest(str(p)) for p in (ASV_DIR / "audio").rglob("*.wav")}
+
+
 def main():
     if not ZIP_PATH.exists():
         sys.exit(f"ERROR: {ZIP_PATH} not found (the SLCeleb audio archive)")
     excluded = trial_speakers()
+    test_hashes = test_audio_hashes()
     zf = zipfile.ZipFile(ZIP_PATH)
 
     rows = []  # (filename relative to train_audio/, speaker)
@@ -65,11 +82,19 @@ def main():
             if member.startswith(dev_prefix) and member.endswith(".wav"):
                 by_speaker[member[len(dev_prefix):].split("/")[0]].append(member)
 
-        kept = {s: m for s, m in by_speaker.items() if s not in excluded}
-        print(f"--- {lang}: {len(by_speaker)} dev speakers, "
-              f"{len(by_speaker) - len(kept)} dropped (also in the trials), {len(kept)} kept")
+        digest = {m: audio_digest(io.BytesIO(zf.read(m))) for ms in by_speaker.values() for m in ms}
+        speakers_of = defaultdict(set)
+        for speaker, members in by_speaker.items():
+            for m in members:
+                speakers_of[digest[m]].add(speaker)
+        in_test = {s for s, ms in by_speaker.items() if any(digest[m] in test_hashes for m in ms)}
+        kept = {s: [m for m in ms if len(speakers_of[digest[m]]) == 1]
+                for s, ms in by_speaker.items() if s not in excluded and s not in in_test}
+        print(f"--- {lang}: {len(by_speaker)} dev speakers; dropped {len(excluded & set(by_speaker))} "
+              f"(id in the trials) and {len(in_test - excluded)} (audio identical to test clips); "
+              f"{len(kept)} kept")
         for speaker in sorted(kept):
-            members = sorted(kept[speaker])
+            members = list({digest[m]: m for m in sorted(kept[speaker])}.values())  # one copy of repeated audio
             random.Random(f"{SEED}/{lang}/{speaker}").shuffle(members)
             for member in members[:MAX_CLIPS_PER_SPEAKER]:
                 filename = f"{lang}/{member[len(dev_prefix):]}"

@@ -2,9 +2,8 @@
 (task family x seed) combination against it, log each result, and return a
 structured summary. Used by slsb.cli; also usable directly as a library.
 
-Never fabricates a value: a task that errors (including speaker diarization,
-which has no runner yet -- see tasks/speaker_diarization.py) is recorded with
-status="skipped"/"error" and a reason, not a guessed score.
+Never fabricates a value: a task that errors is recorded with status="error"
+and a reason, not a guessed score.
 """
 import shutil
 import time
@@ -12,29 +11,28 @@ from pathlib import Path
 
 import torch
 
-from slsb.tasks import EXCLUDED_TASK_DIRS, FAMILY_DIR_PREFIXES, FAMILY_MODULES
+from slsb.tasks import EXCLUDED_TASKS, FAMILY_DIR_PREFIXES, FAMILY_MODULES
 from slsb.tasks._common import set_seed
-from slsb.tasks.speaker_diarization import discover as discover_diarization
+from slsb.tasks.speaker_diarization import diarization_specs
 from slsb.upstream.loader import load_upstream
 from slsb.utils import mlflow_logger
 from slsb.utils.datasets import discover_tasks, find_unrecognized_dirs
 from slsb.utils.params import load_params
 
-DIARIZATION_LANGS = ("sinhala", "tamil")
 
 
 def matching_dirs(data_dir: Path, family: str) -> list[str]:
     """Directory names under data_dir that belong to the given task family,
     found by name prefix (data/<prefix>*) -- works even for families like
     "sd" that discover_tasks() doesn't recognize (RTTM-only, no label file).
-    Folders in EXCLUDED_TASK_DIRS are left out."""
+    Folders in EXCLUDED_TASKS are left out."""
     data_dir = Path(data_dir)
     if not data_dir.exists():
         return []
     prefixes = FAMILY_DIR_PREFIXES[family]
     return sorted(
         entry.name for entry in data_dir.iterdir()
-        if entry.is_dir() and entry.name.startswith(prefixes) and entry.name not in EXCLUDED_TASK_DIRS
+        if entry.is_dir() and entry.name.startswith(prefixes) and entry.name not in EXCLUDED_TASKS
     )
 
 
@@ -50,8 +48,12 @@ def family_of(spec) -> str:
         return "asr"
     if spec.kind == "verification":
         return "asv"
+    if spec.kind == "diarization":
+        return "sd"
     if spec.kind == "classification" and spec.task in ("sid", "er"):
         return spec.task
+    if spec.kind == "classification" and spec.task.startswith("ic"):
+        return "ic"
     raise ValueError(f"no runner for task {spec.name} (kind {spec.kind})")
 
 
@@ -68,14 +70,15 @@ def run_benchmark(upstream_name: str, families: list[str], data_dir: Path, seeds
 
     all_specs = discover_tasks(data_dir)
     wanted_dirnames = {d for family in families for d in matching_dirs(data_dir, family)}
-    specs = sorted((s for s in all_specs if s.task_dir.name in wanted_dirnames), key=lambda s: s.name)
+    all_specs += diarization_specs(data_dir, [d for d in wanted_dirnames if d.startswith("sd_")])
+    specs = sorted((s for s in all_specs if s.task_dir.name in wanted_dirnames and s.name not in EXCLUDED_TASKS),
+                   key=lambda s: s.name)
 
-    unrecognized = find_unrecognized_dirs(data_dir)
-    run_diarization = "sd" in families
+    unrecognized = [d for d in find_unrecognized_dirs(data_dir) if not d.startswith("sd_")]
 
     print(f"upstream: {upstream_name}  device: {device}")
     print(f"discovered {len(specs)} runnable task(s): {[s.name for s in specs]}")
-    if unrecognized and not run_diarization:
+    if unrecognized:
         print(f"NOTE: {len(unrecognized)} data folder(s) with no recognized label file "
               f"were not requested (not in --tasks): {unrecognized}")
 
@@ -129,28 +132,6 @@ def run_benchmark(upstream_name: str, families: list[str], data_dir: Path, seeds
         for cleanup in shared.get("cleanup", []):
             cleanup()
     shutil.rmtree(feature_root, ignore_errors=True)
-
-    for seed in seeds:
-        if run_diarization:
-            for lang in DIARIZATION_LANGS:
-                if f"sd_{lang}" not in wanted_dirnames:
-                    continue
-                basenames = discover_diarization(data_dir, lang)
-                entry = {"upstream": upstream_name, "task": "sd", "language": lang,
-                          "name": f"sd_{lang}", "kind": "diarization", "seed": seed}
-                if not basenames:
-                    print(f"--- sd_{lang} (diarization) --- no wav/rttm pairs found, skipping")
-                    entry.update(status="skipped", error="no data")
-                else:
-                    print(f"--- sd_{lang} (diarization) ---", flush=True)
-                    try:
-                        FAMILY_MODULES["sd"].run(upstream, data_dir, lang, params, seed=seed)
-                        raise AssertionError("unreachable: speaker_diarization.run should always raise")
-                    except NotImplementedError as e:
-                        print(f"    SKIPPED: {e}")
-                        mlflow_logger.log_skipped(csv_path, upstream_name, "sd", lang)
-                        entry.update(status="skipped", error=str(e))
-                results.append(entry)
 
     del upstream
     if device.type == "cuda":

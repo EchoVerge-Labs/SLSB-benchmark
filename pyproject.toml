@@ -22,6 +22,7 @@ dependencies = [
     "numpy",
     "scikit-learn",
     "jiwer",
+    "pyannote.metrics>=3.2",
     "mlflow",
     "omegaconf",
     "pydantic",

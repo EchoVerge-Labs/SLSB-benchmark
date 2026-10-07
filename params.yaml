@@ -25,9 +25,32 @@ asr:
   max_epochs: 60
   patience: 8
 
+# SD: oracle speech regions, speaker-embedding head (as for ASV) trained on the
+# train recordings' single-speaker stretches, windows clustered by average-linkage
+# AHC on cosine distance; threshold and early stopping on dev DER.
+sd:
+  head: stats
+  embedding_size: 256
+  margin: 0.4
+  scale: 30.0
+  window_seconds: 1.5
+  hop_seconds: 0.75
+  min_train_seconds: 1.0   # shorter single-speaker stretches don't train the head
+  batch_size: 64
+  lr_grid: [1.0e-3, 1.0e-4]
+  max_epochs: 30
+  patience: 5
+  collar: 0.25             # seconds around reference boundaries excluded from DER
+  thresholds: {start: 0.05, stop: 1.0, num: 20}   # cosine-distance grid, tuned on dev
+  layer_mix:
+    batch_size: 32
+    lr_grid: [1.0e-3]
+    max_epochs: 100
+    patience: 10
+
 # ASV: speaker-embedding head + AM-softmax on SLCeleb dev speakers, cosine scoring,
 # selected on dev EER. head: stats (mean+std pooling -> linear) won on dev over
-# SUPERB's x-vector, which overfits 125 speakers in 1-2 epochs (see
+# SUPERB's x-vector, which overfit few training speakers in 1-2 epochs (see
 # tasks/speaker_verification.py); head: xvector restores it.
 asv:
   head: stats

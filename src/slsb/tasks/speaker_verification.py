@@ -5,10 +5,10 @@ held-out training speakers, scored by cosine-similarity EER on
 data/asv/trials_*.csv.
 
 The default head is statistics pooling (mean + std over frames -> linear
-embedding). It was chosen over SUPERB's x-vector on dev EER: with only 125
-training speakers the x-vector overfits within one or two epochs (dev EER
-~0.17, best epoch 1-2 on every seed), while statistics pooling keeps improving
-for ~14 epochs and reaches dev EER ~0.12, with far less spread across seeds.
+embedding). It was chosen over SUPERB's x-vector on dev EER, on the
+80-speaker Tamil training set: dev EER 0.123 +- 0.003 over 3 seeds, against
+0.142-0.186 for four x-vector variants, which peak within 3-6 epochs while
+statistics pooling keeps improving for ~13.
 `head: xvector` in params.yaml restores the x-vector.
 
 Storing every layer's frames for ~45 h of training audio would take hundreds of

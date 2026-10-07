@@ -51,14 +51,13 @@ See `make benchmark` for a minimal example.
 | `sid` | `sid` | multilingual | classification | accuracy | validated |
 | `asv` | `asv` | Sinhala, Tamil (trial pairs) | verification | EER | validated |
 | `er` | `er_tamil` | Tamil | classification | accuracy | validated (speaker-disjoint 5-fold) |
-| `sd` | `sd_sinhala`, `sd_tamil` | Sinhala, Tamil | diarization | DER | **not implemented** — see below |
+| `sd` | `sd_sinhala`, `sd_tamil` | Sinhala, Tamil | diarization | DER | validated (oracle speech regions) |
 
-`asr_omni_sinhala` is **not run** from v0.2 (one speaker; see below).
-`er_sinhala` is **excluded** from this repo's data pending dataset-quality
-fixes upstream. `sd_*` data is staged (wav + RTTM pairs) but has no DER
-evaluator yet; `slsb run --tasks sd` reports each combo as `skipped` rather
-than fabricating a score. See [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) for detail
-on both.
+Not run from v0.2: `asr_omni_sinhala` (one speaker) and `asv_sinhala`
+(SLCeleb's Sinhala data is 1,064 recordings copied under 39 speaker ids, see
+[`docs/slceleb_data_issues.md`](docs/slceleb_data_issues.md)); SID is
+therefore Tamil-only. `er_sinhala` is **excluded** from this repo's data
+pending dataset-quality fixes upstream. See [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md).
 
 ## Protocol (v0.2)
 
@@ -70,7 +69,8 @@ records `protocol` and `slsb_version`.
 | ASR | weighted sum + 2-layer BiLSTM (1024/direction) + CTC over characters, greedy decoding | speaker-disjoint train/dev/test, 70/10/20 | dev CER |
 | SID | weighted sum + mean-pool + linear | closed set (every speaker is a class), stratified train/dev/test | dev accuracy |
 | ER | weighted sum + mean-pool + linear | speaker-disjoint 5-fold cross-validation; per fold, the next fold is dev; mean over folds | dev accuracy |
-| ASV | weighted sum + mean/std statistics pooling + linear embedding, AM-softmax, cosine scoring | trained on 125 SLCeleb dev speakers, selected on dev trials from 14 more; tested on the trial lists, whose speakers it never sees | dev EER |
+| ASV | weighted sum + mean/std statistics pooling + linear embedding, AM-softmax, cosine scoring | trained on 80 SLCeleb Tamil dev speakers, selected on dev trials from 9 more; tested on the Tamil trial list, whose speakers it never sees | dev EER |
+| SD | oracle speech regions; speaker-embedding head as for ASV, trained on the train recordings; windows clustered per recording (AHC, cosine), number of speakers never given | recording-disjoint train/dev/test, 40/20/40 | dev DER (threshold + early stopping) |
 
 - **Model selection:** every head is trained per learning rate in `params.yaml`'s
   `lr_grid`, with early stopping on the dev split. The grid is searched on the
@@ -82,9 +82,10 @@ records `protocol` and `slsb_version`.
   hidden states are cached (`<out>/.features/`, deleted when the task finishes)
   and every epoch, learning rate and seed trains on them.
 - **ASV departs from SUPERB twice.** (1) Its head is statistics pooling, not
-  SUPERB's x-vector: with 125 training speakers the x-vector overfits within
-  1-2 epochs (dev EER ~0.17), while statistics pooling reaches ~0.12 and is far
-  more stable across seeds -- chosen on dev EER, never on test. (2) Storing
+  SUPERB's x-vector, chosen on dev EER (never on test) on the 80-speaker
+  Tamil training set: statistics pooling reached dev EER 0.123 +- 0.003 (3
+  seeds) against 0.142-0.186 for four x-vector variants, and keeps improving
+  for ~13 epochs where the x-vectors peak within 3-6. (2) Storing
   every layer's frames for ~45 h of training audio is too large, so the layer
   weights are fixed first, from a mean-pool speaker classifier on a subset of
   the training speakers.

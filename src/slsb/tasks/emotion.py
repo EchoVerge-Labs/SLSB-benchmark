@@ -19,7 +19,8 @@ from slsb.utils.datasets import load_split
 
 def prepare(upstream, spec, params, work_dir, shared):
     split = load_split(spec)
-    features = prepare_utterance_features(upstream, spec, [f for fold in split["folds"] for f in fold])
+    parts = split["folds"] if "folds" in split else [split["train"], split["dev"], split["test"]]
+    features = prepare_utterance_features(upstream, spec, [f for part in parts for f in part])
     features.split = split
     return features
 

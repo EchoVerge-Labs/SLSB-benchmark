@@ -1,0 +1,12 @@
+family: ic
+kind: classification
+data_dirs: [ic_banking_sinhala, ic_banking_tamil, ic_health_tamil]  # data_prep/prep_intent.py
+languages: [sinhala, tamil]
+primary_metric: accuracy
+secondary_metrics: [macro_f1]
+head: linear  # WeightedSum + mean-pool + linear (slsb.tasks._common.UtteranceHead)
+split: speaker_disjoint_5fold  # ic_banking_sinhala: random_stratified_no_speaker_ids (no speaker info)
+notes: >
+  Banking: 6 intents (account balance, money transfer, bill payment, ...) read
+  from fixed sentences. Health: 16 symptom intents. Licence of the banking data:
+  academic / research use only.

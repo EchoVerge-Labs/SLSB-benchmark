@@ -5,6 +5,7 @@ import importlib.util
 import json
 from pathlib import Path
 
+import numpy as np
 import pytest
 import torch
 
@@ -192,3 +193,85 @@ def test_stats_pooling_head():
     emb = model.encoder(torch.randn(4, 30, 8))
     assert emb.shape == (4, 6)
     assert model.loss(emb, torch.tensor([0, 1, 2, 0])).ndim == 0
+
+
+def _wav(path, seed):
+    import soundfile as sf
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sf.write(str(path), np.random.RandomState(seed).randint(-3000, 3000, 1600).astype("int16"), 16000)
+
+
+def test_shared_audio_is_caught_even_with_a_different_file(tmp_path):
+    import soundfile as sf
+    _wav(tmp_path / "a.wav", 1)
+    _wav(tmp_path / "b.wav", 2)
+    # The same samples re-written to another file must still count as the same audio.
+    data, _ = sf.read(str(tmp_path / "a.wav"), dtype="int16")
+    sf.write(str(tmp_path / "a_copy.wav"), data, 16000, subtype="PCM_16")
+    make_splits.assert_no_shared_audio("ok", {"train": ["a.wav"], "test": ["b.wav"]}, tmp_path)
+    with pytest.raises(AssertionError):
+        make_splits.assert_no_shared_audio("leak", {"train": ["a.wav"], "test": ["a_copy.wav"]}, tmp_path)
+
+
+def test_closed_set_split_dedupes_and_drops_conflicting_labels(tmp_path):
+    task_dir = tmp_path / "sid"
+    rows = []
+    for spk in range(4):
+        for c in range(10):
+            _wav(task_dir / "audio" / f"s{spk}_{c}.wav", spk * 100 + c)
+            rows.append((f"s{spk}_{c}.wav", f"s{spk}"))
+    _wav(task_dir / "audio" / "dup.wav", 0)        # copy of s0_0, same label -> one copy kept
+    _wav(task_dir / "audio" / "clash.wav", 101)    # copy of s1_1 under s2 -> both dropped
+    rows += [("dup.wav", "s0"), ("clash.wav", "s2")]
+    _write_csv(task_dir / "labels.csv", ["filename", "label"], rows)
+    split = make_splits.closed_set_split(_spec(task_dir, "sid", "sid", "classification", "labels.csv"))
+    kept = split["train"] + split["dev"] + split["test"]
+    assert "clash.wav" not in kept and "s1_1.wav" not in kept
+    assert ("dup.wav" in kept) != ("s0_0.wav" in kept)
+    assert split["diagnostics"]["ambiguous_label_files_dropped"] == 2
+    make_splits.assert_no_shared_audio("sid", {k: split[k] for k in ("train", "dev", "test")}, task_dir / "audio")
+
+
+def test_intent_family_and_task_exclusions():
+    from slsb.runner import family_of
+    from slsb.tasks import EXCLUDED_TASKS, FAMILY_MODULES
+    spec = TaskSpec(name="ic_health_tamil", task="ic_health", lang="tamil", kind="classification",
+                    task_dir=Path("."), audio_dir=Path("."), label_path=Path("labels.csv"))
+    assert family_of(spec) == "ic" and "ic" in FAMILY_MODULES
+    assert {"asr_omni_sinhala", "asv_sinhala"} <= EXCLUDED_TASKS
+
+
+def test_diarization_helpers():
+    from slsb.tasks import speaker_diarization as sd
+    turns = [(0.0, 4.0, "a"), (3.0, 6.0, "b"), (8.0, 9.0, "a")]
+    assert sd.speech_regions(turns) == [(0.0, 6.0), (8.0, 9.0)]
+    # 3-4 s is overlapped, so it is not a single-speaker stretch
+    assert sd.single_speaker_spans(turns) == [(0.0, 3.0, "a"), (4.0, 6.0, "b"), (8.0, 9.0, "a")]
+    wins = sd.windows(0.0, 4.0, 1.5, 0.75)
+    assert wins[0] == (0.0, 1.5) and wins[-1] == (2.5, 4.0)
+    assert sd.windows(0.0, 1.0, 1.5, 0.75) == [(0.0, 1.0)]
+    ann = sd.annotation([(0, 1, 1), (1, 2, 1), (2, 3, 2)], "r")
+    assert len(list(ann.itertracks())) == 2  # touching turns of one label are merged
+
+
+def test_der_is_zero_for_a_perfect_clustering():
+    from slsb.tasks import speaker_diarization as sd
+    turns = [(0.0, 3.0, "a"), (3.0, 6.0, "b")]
+    rec = sd.Recording("r", "x", turns)
+    # Embeddings that separate the two speakers perfectly; window spans tile the timeline.
+    spans = [(0.0, 1.5), (1.5, 3.0), (3.0, 4.5), (4.5, 6.0)]
+    embs = np.array([[1.0, 0.0], [1.0, 0.01], [0.0, 1.0], [0.01, 1.0]])
+    metric = sd.der_components([rec], {"r": (embs, spans)}, threshold=0.5, collar=0.0)
+    assert abs(metric) == pytest.approx(0.0)
+    merged = sd.der_components([rec], {"r": (embs, spans)}, threshold=1.5, collar=0.0)  # one cluster
+    assert abs(merged) == pytest.approx(0.5)
+
+
+def test_rttm_turns_are_clipped_to_the_audio(tmp_path):
+    from slsb.tasks import speaker_diarization as sd
+    rttm = tmp_path / "r.rttm"
+    rttm.write_text("SPEAKER r 1 0.0 5.0 <NA> <NA> a <NA> <NA>\n"
+                    "SPEAKER r 1 8.0 4.0 <NA> <NA> b <NA> <NA>\n"
+                    "SPEAKER r 1 11.0 2.0 <NA> <NA> a <NA> <NA>\n")
+    assert sd.read_rttm(rttm, duration=10.0) == [(0.0, 5.0, "a"), (8.0, 10.0, "b")]
+    assert len(sd.read_rttm(rttm)) == 3
