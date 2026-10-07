@@ -3,7 +3,7 @@
 Scores are only comparable within one protocol version. Every result records `protocol`
 and `slsb_version`.
 
-## Unreleased · protocol v0.3
+## v0.3.0 · 2026-10-07
 
 **v0.2 scores are not comparable with v0.3.**
 

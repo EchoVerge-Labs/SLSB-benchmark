@@ -7,7 +7,7 @@ Ten tasks across six families, leak-checked splits, standard downstream heads, a
 
 [![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](#installation)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.14%20·%20CUDA%2013.0-EE4C2C?logo=pytorch&logoColor=white)](#installation)
-[![Protocol](https://img.shields.io/badge/protocol-v0.2-2a78d6)](docs/protocol.md)
+[![Protocol](https://img.shields.io/badge/protocol-v0.3-2a78d6)](docs/protocol.md)
 [![Data](https://img.shields.io/badge/data-DVC%20·%20DagsHub-13ADC7?logo=dvc&logoColor=white)](docs/data.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -71,6 +71,9 @@ flowchart LR
     D --> U --> F --> H --> S --> T
 ```
 
+Every hidden state is layer-normed over its features before the weighted sum (since v0.3),
+so layers with a large scale cannot dominate the mix regardless of what they encode.
+
 | Task family | Downstream head | Selected on |
 |---|---|---|
 | ASR | weighted sum + 2-layer BiLSTM (1024 per direction) + CTC over characters, greedy decoding | dev CER |
@@ -97,7 +100,8 @@ seeds, feature caching, hyperparameters and leakage checks.
 
 **XLS-R 300M after continued pre-training** on 200 h of Sinhala and Tamil
 ([Model-Training-Pipeline](https://github.com/EchoVerge-Labs/Model-Training-Pipeline),
-checkpoint 9000), v0.2 protocol, 3 seeds:
+checkpoint 9000), **v0.2 protocol**, 3 seeds. These predate v0.3's per-layer layer norm and
+are not comparable with v0.3 scores; the reference model is being re-run under v0.3:
 
 | Task | Language | Metric | Mean ± s.d. |
 |---|---|---|---|
@@ -117,7 +121,7 @@ and test, which flatters the score.
 
 These are reference numbers for a single model, not a leaderboard. Scores from protocol
 v0.1 are **not comparable** with these, and the baseline encoders (XLS-R, WavLM, HuBERT,
-mHuBERT-147, wav2vec 2.0) are being re-run under v0.2. Every number above is read from
+mHuBERT-147, wav2vec 2.0) are being re-run under v0.3. Every number above is read from
 [`docs/results/`](docs/results/); see [docs/results.md](docs/results.md).
 
 ## Quick start
@@ -125,7 +129,7 @@ mHuBERT-147, wav2vec 2.0) are being re-run under v0.2. Every number above is rea
 ### Installation
 
 ```bash
-pip install git+https://github.com/EchoVerge-Labs/SLSB-benchmark.git@v0.2.1
+pip install git+https://github.com/EchoVerge-Labs/SLSB-benchmark.git@v0.3.0
 # or, from a clone, with test and lint tools
 pip install -e ".[dev]"
 ```
@@ -181,7 +185,7 @@ For a quick end-to-end check, `SLSB_EPOCHS_OVERRIDE=2` caps every head at two ep
 │   ├── metrics/, utils/       # WER/CER/EER/accuracy, datasets and splits, MLflow logging
 ├── data_prep/                 # builds data/ from each source; make_splits.py writes split_v2.json
 ├── data.dvc                   # pointer to the versioned data/ on DagsHub
-├── params.yaml                # downstream-head hyperparameters (the v0.2 protocol)
+├── params.yaml                # upstream + downstream-head hyperparameters (the v0.3 protocol)
 ├── configs/tasks/             # one card per task family
 ├── docs/                      # protocol, tasks, data, results; figures and their source CSVs
 ├── tests/                     # unit and protocol tests (no GPU, data or network needed)
@@ -242,7 +246,7 @@ and BibTeX from it.
              S. A. Talagala and Uthayasanker Thayasivam},
   title   = {{SLSB}: {Sinhala} \& {Lankan-Tamil} Speech Benchmark},
   url     = {https://github.com/EchoVerge-Labs/SLSB-benchmark},
-  version = {0.2.1},
+  version = {0.3.0},
   year    = {2026}
 }
 ```

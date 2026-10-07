@@ -1,4 +1,4 @@
-# Protocol (v0.2)
+# Protocol (v0.3)
 
 How SLSB turns a frozen encoder into a set of scores. Everything here is implemented in
 [`src/slsb/`](../src/slsb), and every hyperparameter lives in [`params.yaml`](../params.yaml).
@@ -24,8 +24,12 @@ flowchart TB
 The upstream is loaded with Hugging Face `AutoModel`, in evaluation mode, with gradients
 disabled. Its feature extractor's own settings apply, including `do_normalize`. A task sees
 the hidden states of **every** layer, from the CNN output through the last transformer
-layer. A learned softmax-weighted sum over those layers is the first part of every head, as
-in SUPERB.
+layer. Each layer is layer-normed over its features (no learned scale or shift), and a
+learned softmax-weighted sum over the normed layers is the first part of every head, as in
+SUPERB with s3prl's `normalize=True`. Without the layer norm the mix is set by layer scale
+rather than content: `wav2vec2-large-lv60`'s top three layers have about 100 times the
+standard deviation of the rest (v0.2 had no layer norm; set `upstream.layer_norm: false`
+to reproduce it).
 
 Because the upstream never changes, its hidden states are identical in every epoch,
 learning-rate trial and seed. So SLSB extracts them **once per task**, caches them under

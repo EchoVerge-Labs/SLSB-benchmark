@@ -1,8 +1,9 @@
-# Summary of the v0.2 protocol. The values the code actually uses live in
+# Summary of the v0.3 protocol. The values the code actually uses live in
 # params.yaml; see README.md "Protocol".
 evaluation:
-  protocol: v0.2
+  protocol: v0.3
   frozen_upstream: true
+  layer_norm: true            # every hidden layer layer-normed before the weighted sum
   weighted_sum: true          # learned softmax weights over every hidden layer
   model_selection: dev        # lr grid + early stopping on the dev split
   splits: data/<task>/split_v2.json
