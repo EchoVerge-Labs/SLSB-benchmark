@@ -3,6 +3,17 @@
 Scores are only comparable within one protocol version. Every result records `protocol`
 and `slsb_version`.
 
+## v0.3.1 · 2026-10-07
+
+Tooling only; the protocol is unchanged (still v0.3), so v0.3.0 and v0.3.1 scores are
+comparable.
+
+- `scripts/log_results.py` logs a finished results folder to MLflow as one run per model in
+  the experiment `slsb-<protocol>`, with every task's mean and s.d. as metrics.
+- The run summary JSON records the protocol, slsb version, slsb commit, layer norm and the
+  `params.yaml` used. The logged `git_commit` is now slsb's own commit, not that of the
+  directory slsb was run from.
+
 ## v0.3.0 · 2026-10-07
 
 **v0.2 scores are not comparable with v0.3.**

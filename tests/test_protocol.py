@@ -294,3 +294,31 @@ def test_upstream_layer_norm_normalizes_every_layer(tmp_path):
     assert raw.shape == normed.shape == (3, 1, raw.shape[2], 32)
     assert torch.allclose(normed.mean(dim=-1), torch.zeros(1), atol=1e-4)
     assert torch.allclose(normed.std(dim=-1, unbiased=False), torch.ones(1), atol=1e-2)
+
+
+def _load_log_results():
+    spec = importlib.util.spec_from_file_location("log_results", REPO_ROOT / "scripts" / "log_results.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_log_results_summarizes_seeds_and_lets_later_folders_win(tmp_path):
+    log_results = _load_log_results()
+
+    def write(folder, entries, **extra):
+        folder.mkdir()
+        (folder / "results_x.json").write_text(json.dumps({"upstream": "m", **extra, "results": entries}))
+
+    def entry(task, seed, value, status="ok"):
+        return {"name": task, "seed": seed, "status": status, "metrics": {"wer": value}}
+
+    write(tmp_path / "a", [entry("asr_x", 0, 0.5), entry("asr_x", 1, 0.7), entry("er_x", 0, 0.9, "error")],
+          protocol="v0.3")
+    write(tmp_path / "b", [entry("er_x", 0, 0.4), entry("er_x", 1, 0.6)])
+    summary, by_task = log_results.load_folders([tmp_path / "a", tmp_path / "b"])
+    metrics, rows, problems = log_results.summarize(by_task)
+    assert summary["protocol"] == "v0.3"
+    assert metrics["asr_x/wer"] == pytest.approx(0.6) and metrics["asr_x/wer_std"] == pytest.approx(0.1414, 1e-3)
+    assert metrics["er_x/wer"] == pytest.approx(0.5)  # the failed seed in folder a was replaced by folder b
+    assert problems == [] and len(rows) == 4

@@ -55,7 +55,7 @@ copy of one, can be benchmarked with a single command.
 | | `ic_health_tamil` | Tamil | health intents | 1,453 clips · 2.0 h | 100 | speaker-disjoint 5-fold CV | accuracy, macro-F1 |
 
 Dataset sources, licences and per-task details are in **[docs/tasks.md](docs/tasks.md)**.
-Three tasks in `data/` are not run in v0.2, each for a data-quality reason; see
+Three tasks in `data/` are not run, each for a data-quality reason; see
 [Limitations](#limitations).
 
 ## Protocol
@@ -129,7 +129,7 @@ mHuBERT-147, wav2vec 2.0) are being re-run under v0.3. Every number above is rea
 ### Installation
 
 ```bash
-pip install git+https://github.com/EchoVerge-Labs/SLSB-benchmark.git@v0.3.0
+pip install git+https://github.com/EchoVerge-Labs/SLSB-benchmark.git@v0.3.1
 # or, from a clone, with test and lint tools
 pip install -e ".[dev]"
 ```
@@ -168,9 +168,28 @@ model on one GB10 GPU. Outputs:
 |---|---|
 | `<out>/benchmark_table.csv` | one row per task, metric and seed |
 | `<out>/results_<upstream>.json` | structured summary: metrics, timings, and the learning rate, best epoch and dev score each head settled on |
-| MLflow (optional) | the same, with `--mlflow-uri https://dagshub.com/EchoVerge-Labs/SLSB-benchmark.mlflow` and `DAGSHUB_TOKEN` set |
+| `<out>/run.log` | the run's console output |
 
 For a quick end-to-end check, `SLSB_EPOCHS_OVERRIDE=2` caps every head at two epochs.
+
+### Log results to DagsHub
+
+Finished runs are logged **after** they complete, one MLflow run per model, to the
+[`slsb-<protocol>` experiment](https://dagshub.com/EchoVerge-LABS/SLSB-benchmark/experiments)
+of this repository. Every task's mean and s.d. over seeds becomes a column, so the
+experiment table is the comparison table:
+
+```bash
+export DAGSHUB_USER=<user> DAGSHUB_TOKEN=<token>
+python scripts/log_results.py results/v0.3/wavlm_large \
+    --name wavlm-large --kind frozen --family wavlm --base-model microsoft/wavlm-large
+python scripts/log_results.py results/v0.3/xlsr300m_copt200h_norm \
+    --name xlsr300m-copt200h-norm --kind adapted --family xlsr \
+    --base-model facebook/wav2vec2-xls-r-300m --checkpoint 9000 --pretrain-hours 200
+```
+
+A model already logged under a protocol is refused unless `--replace` is given. Prefer this
+over `slsb run --mlflow-uri`, which logs one run per task and seed.
 
 ## Repository layout
 
@@ -246,7 +265,7 @@ and BibTeX from it.
              S. A. Talagala and Uthayasanker Thayasivam},
   title   = {{SLSB}: {Sinhala} \& {Lankan-Tamil} Speech Benchmark},
   url     = {https://github.com/EchoVerge-Labs/SLSB-benchmark},
-  version = {0.3.0},
+  version = {0.3.1},
   year    = {2026}
 }
 ```

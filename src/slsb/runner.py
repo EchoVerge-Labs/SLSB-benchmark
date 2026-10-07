@@ -11,6 +11,7 @@ from pathlib import Path
 
 import torch
 
+from slsb import PROTOCOL, __version__
 from slsb.tasks import EXCLUDED_TASKS, FAMILY_DIR_PREFIXES, FAMILY_MODULES
 from slsb.tasks._common import set_seed
 from slsb.tasks.speaker_diarization import diarization_specs
@@ -18,6 +19,10 @@ from slsb.upstream.loader import load_upstream
 from slsb.utils import mlflow_logger
 from slsb.utils.datasets import discover_tasks, find_unrecognized_dirs
 from slsb.utils.params import load_params
+
+# The slsb source tree: its git commit is what produced a result (the working
+# directory may be any repo, e.g. the training pipeline).
+SLSB_SOURCE = Path(__file__).resolve().parent
 
 
 
@@ -83,7 +88,8 @@ def run_benchmark(upstream_name: str, families: list[str], data_dir: Path, seeds
               f"were not requested (not in --tasks): {unrecognized}")
 
     upstream = load_upstream(upstream_name, device, layer_norm=params.get("upstream", {}).get("layer_norm", False))
-    print(f"per-layer layer norm: {upstream.layer_norm}")
+    upstream_layer_norm = upstream.layer_norm
+    print(f"per-layer layer norm: {upstream_layer_norm}")
     results = []
     feature_root = out_dir / ".features"
     shared_by_family = {}
@@ -119,7 +125,7 @@ def run_benchmark(upstream_name: str, families: list[str], data_dir: Path, seeds
                 print(f"    {metrics_out}  split={split_type}  {details}", flush=True)
                 mlflow_logger.log_run(csv_path, upstream_name, spec.task, spec.lang, seed=seed,
                                       metrics=metrics_out, perf=perf, split=split_type, details=details,
-                                      mlflow_uri=mlflow_uri, repo_root=Path.cwd())
+                                      mlflow_uri=mlflow_uri, repo_root=SLSB_SOURCE)
                 entry.update(status="ok", split=split_type, metrics=metrics_out, perf=perf, details=details)
             except Exception as e:
                 print(f"    FAILED: {e}")
@@ -138,4 +144,7 @@ def run_benchmark(upstream_name: str, families: list[str], data_dir: Path, seeds
     if device.type == "cuda":
         torch.cuda.empty_cache()
 
-    return {"upstream": upstream_name, "families": families, "seeds": seeds, "results": results}
+    return {"upstream": upstream_name, "families": families, "seeds": seeds,
+            "protocol": PROTOCOL, "slsb_version": __version__,
+            "slsb_commit": mlflow_logger.get_git_commit(SLSB_SOURCE),
+            "layer_norm": upstream_layer_norm, "params": params, "results": results}

@@ -7,7 +7,7 @@ Each git tag pins the matching data version through `data.dvc`.
 
 ```bash
 git clone git@github.com:EchoVerge-Labs/SLSB-benchmark.git && cd SLSB-benchmark
-git checkout v0.3.0
+git checkout v0.3.1
 dvc pull
 ```
 

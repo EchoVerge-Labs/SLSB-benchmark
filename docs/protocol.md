@@ -149,5 +149,18 @@ speaker confusion.
 Each (task, seed) run writes one row per metric to `<out>/benchmark_table.csv`, and an entry
 to `<out>/results_<upstream>.json` with the metrics, timings, split type and the head's
 details: learning rate, best epoch and dev score, plus per-fold accuracies for k-fold tasks
-and the layer weights for speaker tasks. With `--mlflow-uri` and `DAGSHUB_TOKEN`, the same
-is logged to MLflow, with the details as `probe_*` parameters.
+and the layer weights for speaker tasks. Since v0.3.1 the JSON also records the protocol,
+slsb version and slsb commit, whether layer norm was on, and the `params.yaml` used.
+
+[`scripts/log_results.py`](../scripts/log_results.py) then logs a finished folder to MLflow
+on DagsHub as **one run per model** in the experiment `slsb-<protocol>`:
+
+| Part | Contents |
+|---|---|
+| metrics | `<task>/<metric>` (mean over seeds) and `<task>/<metric>_std` for every task |
+| params | upstream, base model, frozen / adapted, checkpoint, continued pre-training hours, protocol, slsb version and commit, seeds, layer norm, `do_normalize` |
+| tags | `kind`, `family`, `protocol`, `slsb.model` (the run name, unique per protocol) |
+| artifacts | the folder's results JSON, `benchmark_table.csv` and `run.log`, plus `per_seed.csv` |
+
+`slsb run --mlflow-uri` still logs live, one run per task and seed, but runs logged that way
+are not comparable rows in the experiment table.
