@@ -1,130 +1,232 @@
-# SLSB-benchmark — Sinhala / Lankan-Tamil Speech Benchmark
+<div align="center">
 
-A frozen-upstream, SUPERB-style benchmark for comparing self-supervised speech
-encoders on Sinhala and Sri Lankan Tamil tasks: the upstream encoder is always
-kept frozen, and only a learned weighted sum over its layers plus a standard
-per-task downstream head is trained, so results reflect what the upstream's
-representations capture.
+# SLSB: Sinhala & Lankan-Tamil Speech Benchmark
 
-## Installation
+**A frozen-upstream, SUPERB-style benchmark for self-supervised speech models on Sinhala and Sri Lankan Tamil.**<br>
+Ten tasks across six families, leak-checked splits, standard downstream heads, and model selection on dev.
 
-```bash
-pip install -e .
-# or
-pip install git+https://github.com/EchoVerge-Labs/SLSB-benchmark.git@v0.2.0
+[![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](#installation)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.14%20·%20CUDA%2013.0-EE4C2C?logo=pytorch&logoColor=white)](#installation)
+[![Protocol](https://img.shields.io/badge/protocol-v0.2-2a78d6)](docs/protocol.md)
+[![Data](https://img.shields.io/badge/data-DVC%20·%20DagsHub-13ADC7?logo=dvc&logoColor=white)](docs/data.md)
+
+[Tasks](#tasks) · [Protocol](#protocol) · [Reference results](#reference-results) · [Quick start](#quick-start) · [Repository layout](#repository-layout) · [Documentation](#documentation) · [Limitations](#limitations) · [Changelog](CHANGELOG.md)
+
+</div>
+
+---
+
+SLSB measures what a speech encoder's representations already know about Sinhala and Tamil.
+The encoder (the *upstream*) is always frozen. For each task, only a learned weighted sum over
+its layers and a small standard head are trained, chosen on a dev set and scored once on a
+held-out test set. Any Hugging Face wav2vec 2.0, HuBERT or WavLM-style checkpoint, or a local
+copy of one, can be benchmarked with a single command.
+
+- **Ten tasks, six families:** speech recognition, emotion recognition, speaker
+  identification, speaker verification, speaker diarization, and intent classification.
+- **Splits that don't leak.** Every split is fixed data, disjoint by speaker or recording
+  where the data allows, and checked automatically so that no identical audio appears in
+  both training and test.
+- **Standard heads, selected on dev.** SUPERB's downstream heads, with learning rate and
+  stopping epoch chosen on a dev set. Each task runs with 3 seeds and reports mean ± s.d.
+- **Every run is traceable.** Results go to a CSV table, a JSON summary and, optionally,
+  MLflow on DagsHub, tagged with the protocol version and the hyperparameters each head
+  settled on.
+
+## Tasks
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/fig1-tasks-dark.png">
+  <img alt="Hours of audio per task: ASR Sinhala 3.6 h, ASR Tamil 1.6 h, emotion recognition Tamil 0.7 h, speaker identification Tamil 18.0 h, speaker verification Tamil 66.8 h, speaker diarization Sinhala 10.0 h and Tamil 2.0 h, intent classification banking Sinhala 6.8 h, banking Tamil 0.4 h, health Tamil 2.0 h." src="docs/assets/fig1-tasks-light.png">
+</picture>
+
+| Family | Task | Language | Data | Size | Speakers | Evaluation | Metric |
+|---|---|---|---|---|---|---|---|
+| Speech recognition | `asr_sinhala` | Sinhala | OpenSLR-52 | 3,000 clips · 3.6 h | 478 | speaker-disjoint train/dev/test | WER, CER |
+| | `asr_tamil` | Tamil | TaLk | 1,214 clips · 1.6 h | 22 | speaker-disjoint train/dev/test | WER, CER |
+| Emotion recognition | `er_tamil` | Tamil | EmoTa | 936 clips · 0.7 h | 22 | speaker-disjoint 5-fold CV | accuracy, macro-F1 |
+| Speaker identification | `sid` | Tamil | SLCeleb | 4,993 clips · 18.0 h | 40 | closed set, train/dev/test | accuracy, macro-F1 |
+| Speaker verification | `asv_tamil` | Tamil | SLCeleb | 18,202 clips · 66.8 h | 89 train · 40 test | 37,720 trials, unseen speakers | EER |
+| Speaker diarization | `sd_sinhala` | Sinhala | SiTa | 60 recordings · 10.0 h | 1–10 per recording | recording-disjoint, 24/12/24 | DER |
+| | `sd_tamil` | Tamil | SiTa | 14 recordings · 2.0 h | 2–6 per recording | recording-disjoint, 6/3/5 | DER |
+| Intent classification | `ic_banking_sinhala` | Sinhala | banking intents | 7,588 clips · 6.8 h | not recorded | stratified train/dev/test | accuracy, macro-F1 |
+| | `ic_banking_tamil` | Tamil | banking intents | 400 clips · 0.4 h | 40 | speaker-disjoint 5-fold CV | accuracy, macro-F1 |
+| | `ic_health_tamil` | Tamil | health intents | 1,453 clips · 2.0 h | 100 | speaker-disjoint 5-fold CV | accuracy, macro-F1 |
+
+Dataset sources, licences and per-task details are in **[docs/tasks.md](docs/tasks.md)**.
+Three tasks in `data/` are not run in v0.2, each for a data-quality reason; see
+[Limitations](#limitations).
+
+## Protocol
+
+```mermaid
+flowchart LR
+    D["<b>data/</b> · DVC<br/>audio, labels,<br/>fixed split_v2.json"]
+    U["<b>Frozen upstream</b><br/>any HF wav2vec 2.0 /<br/>HuBERT / WavLM model"]
+    F["<b>Hidden states</b><br/>every layer, extracted<br/>once per task"]
+    H["<b>Weighted sum + head</b><br/>BiLSTM-CTC · mean-pool + linear<br/>stats-pool + AM-softmax"]
+    S["<b>Select on dev</b><br/>learning-rate grid,<br/>early stopping"]
+    T["<b>Score test once</b><br/>3 seeds,<br/>mean ± s.d."]
+    D --> U --> F --> H --> S --> T
 ```
 
-For development (linting + tests):
+| Task family | Downstream head | Selected on |
+|---|---|---|
+| ASR | weighted sum + 2-layer BiLSTM (1024 per direction) + CTC over characters, greedy decoding | dev CER |
+| Emotion, speaker ID, intent | weighted sum + mean-pool + linear | dev accuracy |
+| Speaker verification | weighted sum + mean/std statistics pooling + linear embedding, AM-softmax; cosine scoring | dev EER |
+| Speaker diarization | the verification head, trained on single-speaker stretches; windows clustered per recording, number of speakers never given | dev DER |
+
+The heads follow SUPERB, with two documented exceptions. Speaker verification uses
+statistics pooling rather than an x-vector, because it was clearly better on dev with only
+89 training speakers. Its layer mix is also fixed before training, because storing every
+layer's frames for its 45 h of training audio would not fit on disk. Diarization takes
+speech regions from the reference annotations, so it measures speaker discrimination
+rather than speech detection.
+
+The full protocol is in **[docs/protocol.md](docs/protocol.md)**: splits, model selection,
+seeds, feature caching, hyperparameters and leakage checks.
+
+## Reference results
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/fig2-reference-results-dark.png">
+  <img alt="Reference run of XLS-R 300M after continued pre-training on 200 h of Sinhala and Tamil. Error rates: ASR WER 0.635 Sinhala and 0.802 Tamil, CER 0.164 and 0.296, verification EER 0.154, diarization DER 0.111 Sinhala and 0.085 Tamil. Accuracy: emotion 0.405, speaker ID 0.992, intent banking 0.987 Sinhala and 0.767 Tamil, intent health 0.487." src="docs/assets/fig2-reference-results-light.png">
+</picture>
+
+**XLS-R 300M after continued pre-training** on 200 h of Sinhala and Tamil
+([Model-Training-Pipeline](https://github.com/EchoVerge-Labs/Model-Training-Pipeline),
+checkpoint 9000), v0.2 protocol, 3 seeds:
+
+| Task | Language | Metric | Mean ± s.d. |
+|---|---|---|---|
+| ASR | Sinhala | WER ↓ / CER ↓ | 0.635 ± 0.008 / 0.164 ± 0.002 |
+| ASR | Tamil | WER ↓ / CER ↓ | 0.802 ± 0.006 / 0.296 ± 0.002 |
+| Emotion recognition | Tamil | accuracy ↑ / macro-F1 ↑ | 0.405 ± 0.018 / 0.387 ± 0.033 |
+| Speaker identification | Tamil | accuracy ↑ | 0.992 ± 0.003 |
+| Speaker verification | Tamil | EER ↓ | 0.154 ± 0.019 |
+| Speaker diarization | Sinhala | DER ↓ | 0.111 ± 0.011 |
+| Speaker diarization | Tamil | DER ↓ | 0.085 ± 0.026 |
+| Intent · banking | Sinhala | accuracy ↑ | 0.987 ± 0.002 \* |
+| Intent · banking | Tamil | accuracy ↑ | 0.767 ± 0.007 |
+| Intent · health | Tamil | accuracy ↑ | 0.487 ± 0.009 |
+
+\* No speaker information exists for this dataset, so the same speakers can appear in train
+and test, which flatters the score.
+
+These are reference numbers for a single model, not a leaderboard. Scores from protocol
+v0.1 are **not comparable** with these, and the baseline encoders (XLS-R, WavLM, HuBERT,
+mHuBERT-147, wav2vec 2.0) are being re-run under v0.2. Every number above is read from
+[`docs/results/`](docs/results/); see [docs/results.md](docs/results.md).
+
+## Quick start
+
+### Installation
 
 ```bash
+pip install git+https://github.com/EchoVerge-Labs/SLSB-benchmark.git@v0.2.0
+# or, from a clone, with test and lint tools
 pip install -e ".[dev]"
 ```
 
-> **ARM64 / DGX Spark (GB10) note:** install `torch` + `torchaudio` as a
-> matched pair from native aarch64 CUDA wheels. Do **not** install or
-> reference `flash-attn` — it does not build on this hardware.
+On ARM64 (e.g. NVIDIA DGX Spark / GB10), install `torch` and `torchaudio` as a matched pair
+from the native aarch64 CUDA wheels first, and do not install `flash-attn`; it does not build
+on this hardware.
 
-## Usage
+### Data
 
-```bash
-slsb run --upstream facebook/wav2vec2-xls-r-300m \
-         --tasks asr,sid,er,sd \
-         --data-dir ./data \
-         --seeds 0,1,2 \
-         --out results/ \
-         --mlflow-uri https://dagshub.com/EchoVerge-Labs/SLSB-benchmark.mlflow
-```
-
-`--upstream` accepts any Hugging Face repo id, or one of the short aliases
-`xlsr`, `mhubert147`, `wavlm_large`. Results are written to `<out>/benchmark_table.csv`
-(append-only score table) and `<out>/results_<upstream>.json` (structured
-summary of this run). MLflow logging is skipped unless `--mlflow-uri` is set
-and `DAGSHUB_TOKEN` is exported.
-
-See `make benchmark` for a minimal example.
-
-## Available tasks
-
-| Family | Data dir(s) | Language(s) | Kind | Primary metric | Status |
-|---|---|---|---|---|---|
-| `asr` | `asr_sinhala`, `asr_tamil` | Sinhala, Tamil | ASR (CTC) | WER (+ CER) | validated |
-| `sid` | `sid` | multilingual | classification | accuracy | validated |
-| `asv` | `asv` | Sinhala, Tamil (trial pairs) | verification | EER | validated |
-| `er` | `er_tamil` | Tamil | classification | accuracy | validated (speaker-disjoint 5-fold) |
-| `sd` | `sd_sinhala`, `sd_tamil` | Sinhala, Tamil | diarization | DER | validated (oracle speech regions) |
-
-Not run from v0.2: `asr_omni_sinhala` (one speaker) and `asv_sinhala`
-(SLCeleb's Sinhala data is 1,064 recordings copied under 39 speaker ids, see
-[`docs/slceleb_data_issues.md`](docs/slceleb_data_issues.md)); SID is
-therefore Tamil-only. `er_sinhala` is **excluded** from this repo's data
-pending dataset-quality fixes upstream. See [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md).
-
-## Protocol (v0.2)
-
-Scores from different protocol versions are not comparable; each MLflow run
-records `protocol` and `slsb_version`.
-
-| Task | Downstream head | Split (`data/<task>/split_v2.json`) | Selected on |
-|---|---|---|---|
-| ASR | weighted sum + 2-layer BiLSTM (1024/direction) + CTC over characters, greedy decoding | speaker-disjoint train/dev/test, 70/10/20 | dev CER |
-| SID | weighted sum + mean-pool + linear | closed set (every speaker is a class), stratified train/dev/test | dev accuracy |
-| ER | weighted sum + mean-pool + linear | speaker-disjoint 5-fold cross-validation; per fold, the next fold is dev; mean over folds | dev accuracy |
-| ASV | weighted sum + mean/std statistics pooling + linear embedding, AM-softmax, cosine scoring | trained on 80 SLCeleb Tamil dev speakers, selected on dev trials from 9 more; tested on the Tamil trial list, whose speakers it never sees | dev EER |
-| SD | oracle speech regions; speaker-embedding head as for ASV, trained on the train recordings; windows clustered per recording (AHC, cosine), number of speakers never given | recording-disjoint train/dev/test, 40/20/40 | dev DER (threshold + early stopping) |
-
-- **Model selection:** every head is trained per learning rate in `params.yaml`'s
-  `lr_grid`, with early stopping on the dev split. The grid is searched on the
-  first run seed; later seeds reuse the learning rate it picked. The test split
-  is scored once, at the end.
-- **Seeds** vary the head's initialisation and batch order. The splits are fixed
-  data, the same for every seed and every upstream.
-- **Features are extracted once per task.** The upstream is frozen, so its
-  hidden states are cached (`<out>/.features/`, deleted when the task finishes)
-  and every epoch, learning rate and seed trains on them.
-- **ASV departs from SUPERB twice.** (1) Its head is statistics pooling, not
-  SUPERB's x-vector, chosen on dev EER (never on test) on the 80-speaker
-  Tamil training set: statistics pooling reached dev EER 0.123 +- 0.003 (3
-  seeds) against 0.142-0.186 for four x-vector variants, and keeps improving
-  for ~13 epochs where the x-vectors peak within 3-6. (2) Storing
-  every layer's frames for ~45 h of training audio is too large, so the layer
-  weights are fixed first, from a mean-pool speaker classifier on a subset of
-  the training speakers.
-- `asr_omni_sinhala` is excluded: it has a single speaker, so it can't be
-  split speaker-disjointly (its data stays in `data/`; see KNOWN_ISSUES.md).
-
-### What changed from v0.1
-
-v0.1 trained one linear layer for a fixed 10 epochs with no dev set, and:
-- `asv` trained its embedding (SID's head) on the same 79 speakers and clips its
-  trials test;
-- `asr_sinhala`'s split was random: all 600 test clips came from speakers also
-  in training;
-- `er_tamil` was scored on a single split of 936 clips;
-- a task's split was cached on first use, so run seeds never changed it.
-
-### Building the v0.2 data
-
-On top of the v0.1 data:
+`data/` is versioned with DVC on DagsHub (about 11 GB):
 
 ```bash
-python data_prep/prep_asr_sinhala_speakers.py   # data/asr_sinhala/speakers.csv
-python data_prep/prep_slceleb_train.py          # data/asv/train_audio/ + train_labels.csv
-python data_prep/make_splits.py                 # data/*/split_v2.json
-```
-
-## Dataset
-
-`data/` is DVC-tracked (remote: DagsHub). After cloning:
-
-```bash
+git clone git@github.com:EchoVerge-Labs/SLSB-benchmark.git && cd SLSB-benchmark
 dvc pull
 ```
 
-## Project layout
+How each task was built from its source, and how to rebuild it, is in
+[docs/data.md](docs/data.md).
+
+### Benchmark a model
+
+```bash
+slsb run --upstream facebook/wav2vec2-xls-r-300m \
+         --tasks asr,er,sid,asv,sd,ic \
+         --seeds 0,1,2 \
+         --data-dir data --params params.yaml \
+         --out results/xlsr300m
+```
+
+`--upstream` takes any Hugging Face repo id, a local checkpoint directory, or one of the
+aliases `xlsr`, `mhubert147` and `wavlm_large`. A full run takes about 3 hours per 300M-parameter
+model on one GB10 GPU. Outputs:
+
+| File | Contents |
+|---|---|
+| `<out>/benchmark_table.csv` | one row per task, metric and seed |
+| `<out>/results_<upstream>.json` | structured summary: metrics, timings, and the learning rate, best epoch and dev score each head settled on |
+| MLflow (optional) | the same, with `--mlflow-uri https://dagshub.com/EchoVerge-Labs/SLSB-benchmark.mlflow` and `DAGSHUB_TOKEN` set |
+
+For a quick end-to-end check, `SLSB_EPOCHS_OVERRIDE=2` caps every head at two epochs.
+
+## Repository layout
 
 ```
-src/slsb/        installable package (cli, runner, tasks/, upstream/, metrics/, utils/)
-configs/         defaults.yaml + per-task-family configs/tasks/*.yaml
-data_prep/       scripts that built data/ from upstream sources (see each script's docstring)
-tests/           smoke + protocol tests (no GPU, data or network needed)
+.
+├── src/slsb/
+│   ├── cli.py, runner.py      # `slsb run`: load the upstream, run every task × seed, log results
+│   ├── features.py            # one-off extraction and caching of frozen hidden states
+│   ├── tasks/                 # one module per family: asr, emotion, sid, speaker_verification,
+│   │                          #   speaker_diarization, intent; shared heads in _common.py
+│   ├── upstream/              # Hugging Face upstream loader
+│   ├── metrics/, utils/       # WER/CER/EER/accuracy, datasets and splits, MLflow logging
+├── data_prep/                 # builds data/ from each source; make_splits.py writes split_v2.json
+├── data.dvc                   # pointer to the versioned data/ on DagsHub
+├── params.yaml                # downstream-head hyperparameters (the v0.2 protocol)
+├── configs/tasks/             # one card per task family
+├── docs/                      # protocol, tasks, data, results; figures and their source CSVs
+├── tests/                     # unit and protocol tests (no GPU, data or network needed)
+├── KNOWN_ISSUES.md
+└── CHANGELOG.md
 ```
+
+`data/` and `results/` are not in git; `data/` is in DVC.
+
+## Documentation
+
+| | |
+|---|---|
+| [Protocol](docs/protocol.md) | Splits, heads, model selection, seeds, feature caching, hyperparameters, leakage checks |
+| [Tasks](docs/tasks.md) | Every task: source corpus, licence, size, split, metric and caveats |
+| [Data](docs/data.md) | Getting the data, rebuilding it from source, and the integrity checks |
+| [Results](docs/results.md) | Reference results, how they are produced, and how to regenerate the figures |
+| [SLCeleb data issues](docs/slceleb_data_issues.md) | The duplicated Sinhala audio in SLCeleb, with a reproduction script |
+| [Known issues](KNOWN_ISSUES.md) | Exclusions and caveats, task by task |
+| [Changelog](CHANGELOG.md) | What changed between versions, and why v0.1 scores are not comparable |
+
+## Limitations
+
+- **Sinhala speaker tasks are missing.** SLCeleb's Sinhala test set is 1,064 recordings
+  copied under 39 speaker IDs, and its Sinhala dev set copies the same audio. So speaker
+  verification is Tamil-only, and speaker identification covers the 40 Tamil speakers
+  ([details](docs/slceleb_data_issues.md)).
+- **Three tasks in `data/` are not run:** `asv_sinhala` (above), `asr_omni_sinhala` (a
+  single speaker, so no speaker-disjoint split) and `er_sinhala` (broken source metadata).
+- **Several test sets are small:** Tamil diarization has 5 test recordings, and Tamil ASR
+  has 5 test speakers. Their scores move more between seeds and between models.
+- **`ic_banking_sinhala` has no speaker information,** so its split is random and its
+  score is optimistic.
+- **No pre-training contamination check yet.** Nothing verifies that an upstream never
+  saw a test clip during pre-training. SLCeleb is YouTube audio, so YouTube-based
+  pre-training corpora could overlap with it.
+- **Diarization uses oracle speech regions,** so its DER isn't comparable with systems
+  that detect speech themselves.
+
+## Acknowledgements
+
+SLSB builds on the [SUPERB](https://superbbenchmark.org/) protocol and on the public
+corpora listed in [docs/tasks.md](docs/tasks.md): OpenSLR-52, TaLk, EmoTa, SLCeleb, SiTa,
+and the Sinhala and Tamil banking and health intent datasets. Each corpus keeps its own
+licence; check [docs/tasks.md](docs/tasks.md) before redistributing any part of `data/`.
+
+---
+
+<sub>EchoVerge Labs · Department of Computer Science and Engineering, University of Moratuwa, Sri Lanka.</sub>
