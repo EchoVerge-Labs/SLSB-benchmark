@@ -3,6 +3,20 @@
 Scores are only comparable within one protocol version. Every result records `protocol`
 and `slsb_version`.
 
+## Unreleased · protocol v0.3
+
+**v0.2 scores are not comparable with v0.3.**
+
+### Changed: protocol
+
+- **Per-layer layer norm.** Every upstream hidden state is layer-normed over its feature
+  axis before the learned weighted sum (s3prl's `Featurizer(normalize=True)`), set by
+  `upstream.layer_norm` in `params.yaml`. Without it, layers with a large scale dominate
+  the mix: `wav2vec2-large-lv60`'s top 3 layers have ~100x the standard deviation of the
+  rest, and on `asr_sinhala` its BiLSTM head never trained (test CER 0.80). With layer
+  norm the same head reaches CER 0.20 in 12 epochs, and XLS-R 300M improves slightly
+  (CER 0.164 -> 0.157). Set `layer_norm: false` to reproduce v0.2.
+
 ## v0.2.1 · 2026-10-07
 
 Documentation and licensing only; the protocol, code paths and data are unchanged from

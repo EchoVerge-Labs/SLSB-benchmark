@@ -21,11 +21,16 @@ UPSTREAM_ALIASES = {
 
 
 class Upstream:
-    def __init__(self, name: str, device: torch.device):
+    def __init__(self, name: str, device: torch.device, layer_norm: bool = False):
         repo = UPSTREAM_ALIASES.get(name, name)
         self.name = name
         self.repo = repo
         self.device = device
+        # Layer-norm every hidden state over its feature axis before any head sees
+        # it (s3prl's Featurizer normalize=True). Without it the weighted sum is
+        # dominated by whichever layers have the largest scale -- e.g.
+        # wav2vec2-large-lv60's top 3 layers are ~100x the rest.
+        self.layer_norm = layer_norm
 
         self.model = AutoModel.from_pretrained(repo).to(device).eval()
         for p in self.model.parameters():
@@ -54,6 +59,8 @@ class Upstream:
 
         outputs = self.model(input_values, attention_mask=attention_mask, output_hidden_states=True)
         hidden_states = torch.stack(outputs.hidden_states, dim=0)  # (L+1, B, T', H)
+        if self.layer_norm:
+            hidden_states = torch.nn.functional.layer_norm(hidden_states, hidden_states.shape[-1:])
 
         if attention_mask is not None and hasattr(self.model, "_get_feature_vector_attention_mask"):
             frame_mask = self.model._get_feature_vector_attention_mask(
@@ -65,5 +72,5 @@ class Upstream:
         return hidden_states, frame_mask
 
 
-def load_upstream(name: str, device: torch.device) -> Upstream:
-    return Upstream(name, device)
+def load_upstream(name: str, device: torch.device, layer_norm: bool = False) -> Upstream:
+    return Upstream(name, device, layer_norm=layer_norm)

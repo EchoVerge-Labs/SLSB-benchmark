@@ -6,6 +6,13 @@
 # most max_epochs), and the best dev score wins. The grid is searched on the
 # first run seed only; later seeds reuse the learning rate it picked.
 
+# Every upstream hidden state is layer-normed over its feature axis before the
+# weighted sum (s3prl's Featurizer normalize=True). Without it the mix is set by
+# layer scale, not content: wav2vec2-large-lv60's top 3 layers are ~100x the rest
+# and its ASR head never trained (test CER 0.80; 0.20 with layer norm).
+upstream:
+  layer_norm: true
+
 # SID, ER: weighted sum over layers + mean-pool + linear (SUPERB).
 utterance:
   batch_size: 32

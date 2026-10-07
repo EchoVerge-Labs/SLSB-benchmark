@@ -275,3 +275,22 @@ def test_rttm_turns_are_clipped_to_the_audio(tmp_path):
                     "SPEAKER r 1 11.0 2.0 <NA> <NA> a <NA> <NA>\n")
     assert sd.read_rttm(rttm, duration=10.0) == [(0.0, 5.0, "a"), (8.0, 10.0, "b")]
     assert len(sd.read_rttm(rttm)) == 3
+
+
+def test_upstream_layer_norm_normalizes_every_layer(tmp_path):
+    from transformers import Wav2Vec2Config, Wav2Vec2FeatureExtractor, Wav2Vec2Model
+
+    from slsb.upstream.loader import Upstream
+
+    config = Wav2Vec2Config(hidden_size=32, num_hidden_layers=2, num_attention_heads=2, intermediate_size=64,
+                            conv_dim=(16, 16), conv_stride=(5, 4), conv_kernel=(10, 8), num_conv_pos_embeddings=16)
+    torch.manual_seed(0)
+    Wav2Vec2Model(config).save_pretrained(tmp_path)
+    Wav2Vec2FeatureExtractor(return_attention_mask=True).save_pretrained(tmp_path)
+    waveforms = [np.random.RandomState(0).randn(4000).astype(np.float32)]
+
+    raw, _ = Upstream(str(tmp_path), torch.device("cpu")).extract(waveforms)
+    normed, _ = Upstream(str(tmp_path), torch.device("cpu"), layer_norm=True).extract(waveforms)
+    assert raw.shape == normed.shape == (3, 1, raw.shape[2], 32)
+    assert torch.allclose(normed.mean(dim=-1), torch.zeros(1), atol=1e-4)
+    assert torch.allclose(normed.std(dim=-1, unbiased=False), torch.ones(1), atol=1e-2)

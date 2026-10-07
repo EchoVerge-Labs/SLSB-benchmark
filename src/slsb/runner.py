@@ -82,7 +82,8 @@ def run_benchmark(upstream_name: str, families: list[str], data_dir: Path, seeds
         print(f"NOTE: {len(unrecognized)} data folder(s) with no recognized label file "
               f"were not requested (not in --tasks): {unrecognized}")
 
-    upstream = load_upstream(upstream_name, device)
+    upstream = load_upstream(upstream_name, device, layer_norm=params.get("upstream", {}).get("layer_norm", False))
+    print(f"per-layer layer norm: {upstream.layer_norm}")
     results = []
     feature_root = out_dir / ".features"
     shared_by_family = {}

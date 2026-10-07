@@ -1,4 +1,4 @@
-"""Loads params.yaml (downstream-head settings for the v0.2 protocol)."""
+"""Loads params.yaml (upstream and downstream-head settings for the v0.3 protocol)."""
 import os
 from pathlib import Path
 
