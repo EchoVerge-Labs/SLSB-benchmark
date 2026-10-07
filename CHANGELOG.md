@@ -3,6 +3,14 @@
 Scores are only comparable within one protocol version. Every result records `protocol`
 and `slsb_version`.
 
+## v0.2.1 · 2026-10-07
+
+Documentation and licensing only; the protocol, code paths and data are unchanged from
+v0.2.0, so v0.2.0 and v0.2.1 scores are directly comparable.
+
+- New README, `docs/` (protocol, tasks, data, results), figures and their source CSVs.
+- MIT `LICENSE` and `CITATION.cff`.
+
 ## v0.2.0 · 2026-10-07
 
 A new evaluation protocol: new splits, heads and model selection, plus two task families.

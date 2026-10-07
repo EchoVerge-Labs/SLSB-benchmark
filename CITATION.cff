@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this benchmark or its results, please cite it as below."
+type: software
+title: "SLSB: Sinhala & Lankan-Tamil Speech Benchmark"
+abstract: >-
+  A frozen-upstream, SUPERB-style benchmark for self-supervised speech models on
+  Sinhala and Sri Lankan Tamil: ten tasks across speech recognition, emotion
+  recognition, speaker identification, speaker verification, speaker diarization and
+  intent classification, with fixed leak-checked splits, standard downstream heads,
+  and model selection on a dev set.
+authors:
+  - name: "M. H. M. Anas"
+  - name: "M. I. F. Ifadha"
+  - name: "V. D. W. Muthumala"
+  - name: "S. A. Talagala"
+  - name: "Uthayasanker Thayasivam"
+repository-code: "https://github.com/EchoVerge-Labs/SLSB-benchmark"
+license: MIT
+version: "0.2.1"
+date-released: "2026-10-07"
+keywords:
+  - speech benchmark
+  - self-supervised speech representations
+  - Sinhala
+  - Tamil
+  - low-resource languages
+  - SUPERB

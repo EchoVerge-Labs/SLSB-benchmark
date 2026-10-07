@@ -9,8 +9,9 @@ Ten tasks across six families, leak-checked splits, standard downstream heads, a
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.14%20·%20CUDA%2013.0-EE4C2C?logo=pytorch&logoColor=white)](#installation)
 [![Protocol](https://img.shields.io/badge/protocol-v0.2-2a78d6)](docs/protocol.md)
 [![Data](https://img.shields.io/badge/data-DVC%20·%20DagsHub-13ADC7?logo=dvc&logoColor=white)](docs/data.md)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-[Tasks](#tasks) · [Protocol](#protocol) · [Reference results](#reference-results) · [Quick start](#quick-start) · [Repository layout](#repository-layout) · [Documentation](#documentation) · [Limitations](#limitations) · [Changelog](CHANGELOG.md)
+[Tasks](#tasks) · [Protocol](#protocol) · [Reference results](#reference-results) · [Quick start](#quick-start) · [Repository layout](#repository-layout) · [Documentation](#documentation) · [Limitations](#limitations) · [Changelog](CHANGELOG.md) · [Citation](#citation) · [License](#license)
 
 </div>
 
@@ -124,7 +125,7 @@ mHuBERT-147, wav2vec 2.0) are being re-run under v0.2. Every number above is rea
 ### Installation
 
 ```bash
-pip install git+https://github.com/EchoVerge-Labs/SLSB-benchmark.git@v0.2.0
+pip install git+https://github.com/EchoVerge-Labs/SLSB-benchmark.git@v0.2.1
 # or, from a clone, with test and lint tools
 pip install -e ".[dev]"
 ```
@@ -184,8 +185,9 @@ For a quick end-to-end check, `SLSB_EPOCHS_OVERRIDE=2` caps every head at two ep
 ├── configs/tasks/             # one card per task family
 ├── docs/                      # protocol, tasks, data, results; figures and their source CSVs
 ├── tests/                     # unit and protocol tests (no GPU, data or network needed)
-├── KNOWN_ISSUES.md
-└── CHANGELOG.md
+├── KNOWN_ISSUES.md, CHANGELOG.md
+├── CITATION.cff
+└── LICENSE
 ```
 
 `data/` and `results/` are not in git; `data/` is in DVC.
@@ -223,9 +225,37 @@ For a quick end-to-end check, `SLSB_EPOCHS_OVERRIDE=2` caps every head at two ep
 ## Acknowledgements
 
 SLSB builds on the [SUPERB](https://superbbenchmark.org/) protocol and on the public
-corpora listed in [docs/tasks.md](docs/tasks.md): OpenSLR-52, TaLk, EmoTa, SLCeleb, SiTa,
-and the Sinhala and Tamil banking and health intent datasets. Each corpus keeps its own
+corpora listed in [docs/tasks.md](docs/tasks.md): OpenSLR-52, TaLK,
+[EmoTa](https://github.com/aaivu/EmoTa), SLCeleb, SiTa, and the Sinhala and Tamil banking
+and health intent datasets. Each corpus keeps its own
 licence; check [docs/tasks.md](docs/tasks.md) before redistributing any part of `data/`.
+
+## Citation
+
+If you use SLSB or its results, please cite the repository. Citation metadata is in
+[`CITATION.cff`](CITATION.cff), and GitHub's **Cite this repository** button produces APA
+and BibTeX from it.
+
+```bibtex
+@software{slsb_benchmark,
+  author  = {M. H. M. Anas and M. I. F. Ifadha and V. D. W. Muthumala and
+             S. A. Talagala and Uthayasanker Thayasivam},
+  title   = {{SLSB}: {Sinhala} \& {Lankan-Tamil} Speech Benchmark},
+  url     = {https://github.com/EchoVerge-Labs/SLSB-benchmark},
+  version = {0.2.1},
+  year    = {2026}
+}
+```
+
+Please also cite the corpora behind the tasks you report; [docs/tasks.md](docs/tasks.md)
+links each one.
+
+## License
+
+The code in this repository is released under the [MIT License](LICENSE).
+
+The corpora in `data/` are not covered by it and keep their own licences, listed in
+[docs/tasks.md](docs/tasks.md).
 
 ---
 

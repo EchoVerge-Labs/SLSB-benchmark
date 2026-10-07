@@ -12,7 +12,7 @@ redistributing its part of `data/`.
 |---|---|---|---|
 | OpenSLR-52, *Large Sinhala ASR training data set* | `asr_sinhala` | CC BY-SA 4.0 | [openslr.org/52](https://openslr.org/52/) |
 | TaLK-Corpus, Sri Lankan Tamil | `asr_tamil` | not confirmed; see source | [ACL Anthology, SPEAKABLE @ LREC 2026](https://aclanthology.org/2026.speakable-1.21/) |
-| EmoTa | `er_tamil` | academic use under CC BY-NC 4.0 (EmoTa licence v1.0); gated; **no redistribution** | [huggingface.co/datasets/aaivu-labs/EmoTa](https://huggingface.co/datasets/aaivu-labs/EmoTa) |
+| EmoTa | `er_tamil` | academic use under CC BY-NC 4.0 (EmoTa licence v1.0); gated on Hugging Face; included here with the authors' permission | [github.com/aaivu/EmoTa](https://github.com/aaivu/EmoTa) · [Hugging Face](https://huggingface.co/datasets/aaivu-labs/EmoTa) |
 | SLCeleb | `sid`, `asv_tamil` | CC BY 4.0 | [IEEE DataPort, DOI 10.21227/smmf-e298](https://ieee-dataport.org/documents/slceleb-speaker-verification) |
 | SiTa | `sd_sinhala`, `sd_tamil` | not confirmed; see source | [ACL Anthology, CHiPSAL 2025](https://aclanthology.org/2025.chipsal-1.8/) |
 | Sinhala and Tamil banking intents (crowdsourced) | `ic_banking_*` | academic / research use only, no commercial use (licence file in the archive) | team archive |
