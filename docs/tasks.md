@@ -88,13 +88,20 @@ clipped to the audio.
 | Prompts | 39 fixed sentences | 31 fixed sentences | 160 phrases |
 | Clips | 7,588 (6.8 h) | 400 (0.4 h) | 1,453 (2.0 h) |
 | Speakers | not recorded | 40 | 100 |
-| Evaluation | stratified train / dev / test | speaker-disjoint 5-fold | speaker-disjoint 5-fold |
+| Evaluation | sentence-disjoint 5-fold | sentence-disjoint 5-fold | sentence-disjoint 5-fold |
 
 Built by [`data_prep/prep_intent.py`](../data_prep/prep_intent.py). Clips without a label in
 the source CSVs are skipped (74 and 187), identical audio is kept once, and two
-Sinhala clips whose copies carry different intents are dropped. Because
-`ic_banking_sinhala` has no speaker information, the same person can appear in train and
-test; its accuracy is optimistic and is marked as such wherever it is reported.
+Sinhala clips whose copies carry different intents are dropped.
+
+Each dataset is a small set of fixed prompts, each read many times (Banking Sinhala:
+147–225 readings per sentence). Until v0.4 every test sentence was also in training, so
+the task partly measured recognising a memorised sentence: `ic_banking_sinhala` scored
+0.97–0.99 for every model. Since v0.5 the folds are **sentence-disjoint**: the prompts
+of a test fold are never heard in training, so a model has to map unseen wording to its
+intent. Speakers may recur across folds (Banking Sinhala records none); a speaker's
+identity predicts their intent only weakly in Tamil (30% vs 25% majority for banking,
+17% vs 7% for health).
 
 ---
 

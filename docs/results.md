@@ -5,9 +5,10 @@
 **Upstream:** XLS-R 300M (`facebook/wav2vec2-xls-r-300m`) after continued pre-training on
 200 h of Sinhala and Tamil with normalised audio, in
 [Model-Training-Pipeline](https://github.com/EchoVerge-Labs/Model-Training-Pipeline),
-checkpoint 9000. **Protocol** v0.4, **seeds** 0, 1, 2, on one NVIDIA GB10 GPU. Nine tasks
-were run under v0.3 (slsb 0.3.0); speaker identification, the only task v0.4 changed, was
-re-run under v0.4 (slsb 0.4.0). A full run takes about 2 hours.
+checkpoint 9000. **Protocol** v0.5, **seeds** 0, 1, 2, on one NVIDIA GB10 GPU. Seven tasks
+were run under v0.3 (slsb 0.3.0), speaker identification under v0.4 (slsb 0.4.0) and the
+three intent tasks under v0.5 (slsb 0.5.0); each later protocol changed only the tasks it
+re-ran. A full run takes about 2 hours.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/fig2-reference-results-dark.png">
@@ -27,25 +28,24 @@ re-run under v0.4 (slsb 0.4.0). A full run takes about 2 hours.
 | Speaker verification | Tamil | EER ↓ | 0.143 ± 0.016 |
 | Speaker diarization | Sinhala | DER ↓ | 0.070 ± 0.007 |
 | Speaker diarization | Tamil | DER ↓ | 0.026 ± 0.003 |
-| Intent · banking | Sinhala | Accuracy ↑ | 0.992 ± 0.002 \* |
-| Intent · banking | Sinhala | Macro-F1 ↑ | 0.992 ± 0.002 \* |
-| Intent · banking | Tamil | Accuracy ↑ | 0.842 ± 0.017 |
-| Intent · banking | Tamil | Macro-F1 ↑ | 0.827 ± 0.018 |
-| Intent · health | Tamil | Accuracy ↑ | 0.541 ± 0.000 |
-| Intent · health | Tamil | Macro-F1 ↑ | 0.530 ± 0.001 |
+| Intent · banking | Sinhala | Accuracy ↑ | 0.896 ± 0.003 |
+| Intent · banking | Sinhala | Macro-F1 ↑ | 0.855 ± 0.000 |
+| Intent · banking | Tamil | Accuracy ↑ | 0.601 ± 0.008 |
+| Intent · banking | Tamil | Macro-F1 ↑ | 0.465 ± 0.001 |
+| Intent · health | Tamil | Accuracy ↑ | 0.346 ± 0.000 |
+| Intent · health | Tamil | Macro-F1 ↑ | 0.334 ± 0.001 |
 
-\* Optimistic: no speaker information, so the same speakers can be in train and test.
-
-Per-seed values are in [`results/reference_xlsr300m_copt200h_norm_v0.4.csv`](results/reference_xlsr300m_copt200h_norm_v0.4.csv).
-The other models are compared on DagsHub, in the `slsb-v0.4` experiment.
+Per-seed values are in [`results/reference_xlsr300m_copt200h_norm_v0.5.csv`](results/reference_xlsr300m_copt200h_norm_v0.5.csv).
+The other models are compared on DagsHub, in the `slsb-v0.5` experiment.
 
 ### Reading these numbers
 
 - **Diarization DER is almost entirely speaker confusion.** With oracle speech regions,
   missed speech is about 1% (overlap) and false alarm is 0.
-- **Intent · banking Sinhala is near ceiling** (0.97–0.99 for every model benchmarked) and
-  separates models poorly; speaker identification, near ceiling under v0.3, is no longer
-  (0.84–0.89 under v0.4).
+- **No task is at ceiling any more.** Speaker identification scored 0.99+ for every model
+  under v0.3 (test clips shared videos with training) and intent · banking Sinhala 0.97–0.99
+  under v0.4 (test sentences were in training). On unseen videos and unseen sentences they
+  now score 0.84–0.89 and about 0.90.
 - **Run-to-run variation.** ASR's BiLSTM uses non-deterministic GPU kernels, so re-running
   the same seed moves WER by about ±0.01. Differences smaller than that, or than the
   seed s.d., should not be read as real.
@@ -59,6 +59,7 @@ The other models are compared on DagsHub, in the `slsb-v0.4` experiment.
 | v0.1 → anything later | **No.** v0.1 trained one linear layer for 10 epochs with no dev set, and its splits leaked (Sinhala ASR test speakers in training; verification trained on its own test speakers). |
 | v0.2 → v0.3 | **No.** v0.3 layer-normalises every upstream layer, which changes every task's input. |
 | v0.3 → v0.4 | **Yes, except speaker identification**, which v0.4 splits by unseen videos. Every other task is identical, which is why v0.4 runs may carry them over (`log_results.py --carry-over`). |
+| v0.4 → v0.5 | **Yes, except the three intent tasks**, which v0.5 splits by unseen sentences. Every other task is identical and carried over from `slsb-v0.4`. |
 
 See the [changelog](../CHANGELOG.md) for each version's changes.
 
@@ -74,5 +75,6 @@ python docs/scripts/make_figures.py --refresh results/<run> [results/<rerun>] --
 ```
 
 `--refresh` takes one or more run directories; a later one replaces an earlier one task by
-task. The reference run combines `results/v0.3/xlsr300m_copt200h_norm` (nine tasks) and
-`results/v0.4/xlsr300m_copt200h_norm_sid` (speaker identification).
+task. The reference run combines `results/v0.3/xlsr300m_copt200h_norm` (seven tasks),
+`results/v0.4/xlsr300m_copt200h_norm_sid` (speaker identification) and
+`results/v0.5/xlsr300m_copt200h_norm_ic` (intent).

@@ -3,6 +3,30 @@
 Scores are only comparable within one protocol version. Every result records `protocol`
 and `slsb_version`.
 
+## v0.5.0 · 2026-10-08
+
+**Only the three intent classification tasks changed.** Every other task's split, code and
+settings are identical to v0.4, so their scores carry over unchanged; only `ic` must be
+re-run.
+
+### Changed: protocol
+
+- **Intent classification is split by sentence.** Each intent dataset is a small set of
+  fixed prompts read many times (Banking Sinhala: 39 sentences, 147–225 readings each), and
+  until v0.4 every test sentence was also in training, so the head could score by
+  recognising the memorised prompt: Banking Sinhala scored 0.97–0.99 for every model. Each
+  intent's sentences are now dealt round-robin over 5 folds (test fold *k*, dev fold *k*+1,
+  train the rest), for `ic_banking_sinhala`, `ic_banking_tamil` and `ic_health_tamil`.
+  Speakers may recur across folds. Adapted XLS-R 300M moves from 0.992 / 0.842 / 0.541 to
+  0.896 / 0.601 / 0.346 (banking Sinhala / banking Tamil / health Tamil).
+- `make_splits.py` asserts that no sentence is in two folds and that every intent is in the
+  training part of every fold.
+
+### Added
+
+- `data/ic_*/sentences.csv` (filename, sentence), written by `prep_intent.py`.
+- `log_results.py --carry-over` for v0.5 copies the unchanged tasks from `slsb-v0.4`.
+
 ## v0.4.0 · 2026-10-08
 
 **Only speaker identification changed.** Every other task's split, code and settings are

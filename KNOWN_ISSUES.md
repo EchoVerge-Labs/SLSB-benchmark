@@ -56,13 +56,14 @@ pre-training audio. SLCeleb (ASV/SID) is YouTube audio, so a continued-pretraini
 corpus built from YouTube could contain the same videos. An audio-fingerprint
 check against each pre-training set is still to be built.
 
-## `ic_banking_sinhala` — no speaker ids
+## Intent classification — speakers may recur across folds
 
-The Sinhala banking intent data names files by recording timestamp only, so its
-split cannot be speaker-disjoint (`random_stratified_no_speaker_ids`): the same
-person can appear in train and test, which flatters its accuracy. Recording
-sessions are no substitute -- most hold a single intent. The banking archives'
-licence allows academic / research use only, no commercial use.
+The intent folds are sentence-disjoint (v0.5), not speaker-disjoint. The Sinhala
+banking data names files by recording timestamp only, so it has no speaker ids at
+all; the Tamil sets do, but holding out both sentences and speakers would leave
+too little training data (Banking Tamil: 400 clips). Speaker identity predicts
+intent only weakly there. There is no Sinhala health-intent dataset. The banking
+archives' licence allows academic / research use only, no commercial use.
 
 ## Task status summary
 
@@ -73,4 +74,4 @@ licence allows academic / research use only, no commercial use.
 | `asv` | `asv_tamil` validated (speaker-disjoint); `asv_sinhala` excluded — corrupt SLCeleb Sinhala data |
 | `er` | validated on `er_tamil` only (speaker-disjoint 5-fold) |
 | `sd` | validated, oracle speech regions (see above) |
-| `ic` | validated; `ic_banking_sinhala` has no speaker ids (random split, optimistic) |
+| `ic` | validated; sentence-disjoint folds since v0.5, speakers may recur |

@@ -30,7 +30,7 @@ REPO = Path(__file__).resolve().parents[2]
 OUT = REPO / "docs" / "assets"
 TABLES = REPO / "docs" / "results"
 TASKS_CSV = TABLES / "tasks.csv"
-RESULTS_CSV = TABLES / "reference_xlsr300m_copt200h_norm_v0.4.csv"
+RESULTS_CSV = TABLES / "reference_xlsr300m_copt200h_norm_v0.5.csv"
 
 THEMES = {
     "light": dict(surface="#fcfcfb", ink="#0b0b0b", ink2="#52514e", muted="#898781",
@@ -205,7 +205,7 @@ def fig_results(t, theme):
             ("sd_sinhala", "der", "Diarization · DER"), ("sd_tamil", "der", "Diarization · DER")]),
         ("Accuracy  ·  higher is better", [
             ("er_tamil", "accuracy", "Emotion"), ("sid", "accuracy", "Speaker ID"),
-            ("ic_banking_sinhala", "accuracy", "Intent · banking*"), ("ic_banking_tamil", "accuracy", "Intent · banking"),
+            ("ic_banking_sinhala", "accuracy", "Intent · banking"), ("ic_banking_tamil", "accuracy", "Intent · banking"),
             ("ic_health_tamil", "accuracy", "Intent · health")]),
     ]
     fig, axes = plt.subplots(1, 2, figsize=(10.4, 4.4), gridspec_kw=dict(wspace=0.62))
@@ -226,8 +226,7 @@ def fig_results(t, theme):
         ax.set_xticks([0, 0.25, 0.5, 0.75, 1.0])
         ax.set_title(heading, loc="left", fontsize=9.5, color=t["ink2"], pad=8)
     title(fig, t, "Reference run: XLS-R 300M after Sinhala/Tamil continued pre-training",
-          "Protocol v0.4. Mean of 3 seeds (dot) and their range (line).  * no speaker ids: the same speakers can be in train "
-          "and test, so it is optimistic.")
+          "Protocol v0.5. Mean of 3 seeds (dot) and their range (line). Intent is scored on sentences unseen in training.")
     fig.subplots_adjust(left=0.17, right=0.98, top=0.78, bottom=0.08)
     save(fig, "fig2-reference-results", theme)
 

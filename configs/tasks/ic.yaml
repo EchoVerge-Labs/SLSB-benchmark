@@ -5,7 +5,7 @@ languages: [sinhala, tamil]
 primary_metric: accuracy
 secondary_metrics: [macro_f1]
 head: linear  # WeightedSum + mean-pool + linear (slsb.tasks._common.UtteranceHead)
-split: speaker_disjoint_5fold  # ic_banking_sinhala: random_stratified_no_speaker_ids (no speaker info)
+split: sentence_disjoint_5fold  # v0.5: test prompts never heard in training; speakers may recur
 notes: >
   Banking: 6 intents (account balance, money transfer, bill payment, ...) read
   from fixed sentences. Health: 16 symptom intents. Licence of the banking data:

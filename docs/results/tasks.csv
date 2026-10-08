@@ -6,6 +6,6 @@ sid,Speaker identification,Tamil,SLCeleb,video_disjoint_closed_set,"train/dev/te
 asv_tamil,Speaker verification,Tamil,SLCeleb,speaker_disjoint_from_trials,"37,720 test trials",18202,66.85,129
 sd_sinhala,Speaker diarization,Sinhala,SiTa,recording_disjoint,24/12/24 recordings,60,10.03,
 sd_tamil,Speaker diarization,Tamil,SiTa,recording_disjoint,6/3/5 recordings,14,2.02,
-ic_banking_sinhala,Intent · banking,Sinhala,Banking intents,random_stratified_no_speaker_ids,train/dev/test,7588,6.75,
-ic_banking_tamil,Intent · banking,Tamil,Banking intents,speaker_disjoint_5fold,5 folds,400,0.39,40
-ic_health_tamil,Intent · health,Tamil,Health intents,speaker_disjoint_5fold,5 folds,1453,2.03,100
+ic_banking_sinhala,Intent · banking,Sinhala,Banking intents,sentence_disjoint_5fold,5 folds,7588,6.75,
+ic_banking_tamil,Intent · banking,Tamil,Banking intents,sentence_disjoint_5fold,5 folds,400,0.39,40
+ic_health_tamil,Intent · health,Tamil,Health intents,sentence_disjoint_5fold,5 folds,1453,2.03,100

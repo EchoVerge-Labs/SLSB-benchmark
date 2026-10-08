@@ -7,7 +7,7 @@ Ten tasks across six families, leak-checked splits, standard downstream heads, a
 
 [![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](#installation)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.14%20·%20CUDA%2013.0-EE4C2C?logo=pytorch&logoColor=white)](#installation)
-[![Protocol](https://img.shields.io/badge/protocol-v0.4-2a78d6)](docs/protocol.md)
+[![Protocol](https://img.shields.io/badge/protocol-v0.5-2a78d6)](docs/protocol.md)
 [![Data](https://img.shields.io/badge/data-DVC%20·%20DagsHub-13ADC7?logo=dvc&logoColor=white)](docs/data.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -50,9 +50,9 @@ copy of one, can be benchmarked with a single command.
 | Speaker verification | `asv_tamil` | Tamil | SLCeleb | 18,202 clips · 66.8 h | 89 train · 40 test | 37,720 trials, unseen speakers | EER |
 | Speaker diarization | `sd_sinhala` | Sinhala | SiTa | 60 recordings · 10.0 h | 1–10 per recording | recording-disjoint, 24/12/24 | DER |
 | | `sd_tamil` | Tamil | SiTa | 14 recordings · 2.0 h | 2–6 per recording | recording-disjoint, 6/3/5 | DER |
-| Intent classification | `ic_banking_sinhala` | Sinhala | banking intents | 7,588 clips · 6.8 h | not recorded | stratified train/dev/test | accuracy, macro-F1 |
-| | `ic_banking_tamil` | Tamil | banking intents | 400 clips · 0.4 h | 40 | speaker-disjoint 5-fold CV | accuracy, macro-F1 |
-| | `ic_health_tamil` | Tamil | health intents | 1,453 clips · 2.0 h | 100 | speaker-disjoint 5-fold CV | accuracy, macro-F1 |
+| Intent classification | `ic_banking_sinhala` | Sinhala | banking intents | 7,588 clips · 6.8 h | not recorded | sentence-disjoint 5-fold CV | accuracy, macro-F1 |
+| | `ic_banking_tamil` | Tamil | banking intents | 400 clips · 0.4 h | 40 | sentence-disjoint 5-fold CV | accuracy, macro-F1 |
+| | `ic_health_tamil` | Tamil | health intents | 1,453 clips · 2.0 h | 100 | sentence-disjoint 5-fold CV | accuracy, macro-F1 |
 
 Dataset sources, licences and per-task details are in **[docs/tasks.md](docs/tasks.md)**.
 Three tasks in `data/` are not run, each for a data-quality reason; see
@@ -95,12 +95,12 @@ seeds, feature caching, hyperparameters and leakage checks.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/fig2-reference-results-dark.png">
-  <img alt="Reference run of XLS-R 300M after continued pre-training on 200 h of Sinhala and Tamil, protocol v0.4. Error rates: ASR WER 0.612 Sinhala and 0.800 Tamil, CER 0.156 and 0.285, verification EER 0.143, diarization DER 0.070 Sinhala and 0.026 Tamil. Accuracy: emotion 0.411, speaker ID 0.876, intent banking 0.992 Sinhala and 0.842 Tamil, intent health 0.541." src="docs/assets/fig2-reference-results-light.png">
+  <img alt="Reference run of XLS-R 300M after continued pre-training on 200 h of Sinhala and Tamil, protocol v0.5. Error rates: ASR WER 0.612 Sinhala and 0.800 Tamil, CER 0.156 and 0.285, verification EER 0.143, diarization DER 0.070 Sinhala and 0.026 Tamil. Accuracy: emotion 0.411, speaker ID 0.876, intent banking 0.896 Sinhala and 0.601 Tamil, intent health 0.346." src="docs/assets/fig2-reference-results-light.png">
 </picture>
 
 **XLS-R 300M after continued pre-training** on 200 h of Sinhala and Tamil
 ([Model-Training-Pipeline](https://github.com/EchoVerge-Labs/Model-Training-Pipeline),
-checkpoint 9000), **protocol v0.4**, 3 seeds:
+checkpoint 9000), **protocol v0.5**, 3 seeds:
 
 | Task | Language | Metric | Mean ± s.d. |
 |---|---|---|---|
@@ -111,16 +111,15 @@ checkpoint 9000), **protocol v0.4**, 3 seeds:
 | Speaker verification | Tamil | EER ↓ | 0.143 ± 0.016 |
 | Speaker diarization | Sinhala | DER ↓ | 0.070 ± 0.007 |
 | Speaker diarization | Tamil | DER ↓ | 0.026 ± 0.003 |
-| Intent · banking | Sinhala | accuracy ↑ | 0.992 ± 0.002 \* |
-| Intent · banking | Tamil | accuracy ↑ | 0.842 ± 0.017 |
-| Intent · health | Tamil | accuracy ↑ | 0.541 ± 0.000 |
+| Intent · banking | Sinhala | accuracy ↑ / macro-F1 ↑ | 0.896 ± 0.003 / 0.855 ± 0.000 |
+| Intent · banking | Tamil | accuracy ↑ / macro-F1 ↑ | 0.601 ± 0.008 / 0.465 ± 0.001 |
+| Intent · health | Tamil | accuracy ↑ / macro-F1 ↑ | 0.346 ± 0.000 / 0.334 ± 0.001 |
 
-\* No speaker information exists for this dataset, so the same speakers can appear in train
-and test, which flatters the score.
+Intent is scored on sentences never heard in training (v0.5).
 
 These are reference numbers for one model. All ten models benchmarked so far (five frozen
 encoders and their continued-pre-training counterparts) are compared in the
-[`slsb-v0.4` experiment on DagsHub](https://dagshub.com/EchoVerge-LABS/SLSB-benchmark/experiments),
+[`slsb-v0.5` experiment on DagsHub](https://dagshub.com/EchoVerge-LABS/SLSB-benchmark/experiments),
 one row per model. Scores from different protocol versions are not comparable. Every number
 above is read from [`docs/results/`](docs/results/); see [docs/results.md](docs/results.md).
 
@@ -129,7 +128,7 @@ above is read from [`docs/results/`](docs/results/); see [docs/results.md](docs/
 ### Installation
 
 ```bash
-pip install git+https://github.com/EchoVerge-Labs/SLSB-benchmark.git@v0.4.0
+pip install git+https://github.com/EchoVerge-Labs/SLSB-benchmark.git@v0.5.0
 # or, from a clone, with test and lint tools
 pip install -e ".[dev]"
 ```
@@ -181,9 +180,9 @@ experiment table is the comparison table:
 
 ```bash
 export DAGSHUB_USER=<user> DAGSHUB_TOKEN=<token>
-python scripts/log_results.py results/v0.4/wavlm_large \
+python scripts/log_results.py results/v0.5/wavlm_large \
     --name wavlm-large --kind frozen --family wavlm --base-model microsoft/wavlm-large
-python scripts/log_results.py results/v0.4/xlsr300m_copt200h_norm \
+python scripts/log_results.py results/v0.5/xlsr300m_copt200h_norm \
     --name xlsr300m-copt200h-norm --kind adapted --family xlsr \
     --base-model facebook/wav2vec2-xls-r-300m --checkpoint 9000 --pretrain-hours 200
 ```
@@ -191,14 +190,16 @@ python scripts/log_results.py results/v0.4/xlsr300m_copt200h_norm \
 A model already logged under a protocol is refused unless `--replace` is given. Prefer this
 over `slsb run --mlflow-uri`, which logs one run per task and seed.
 
-**Moving a model from v0.3 to v0.4** needs only a speaker-ID re-run (v0.4 changed nothing
-else); `--carry-over` copies the other nine tasks from the model's `slsb-v0.3` run:
+**Moving a model to the next protocol** needs only a re-run of the tasks it changed;
+`--carry-over` copies the other tasks from the model's run under the previous protocol.
+v0.4 changed only speaker ID (carried over from `slsb-v0.3`), v0.5 only the three intent
+tasks (carried over from `slsb-v0.4`, so log v0.4 first):
 
 ```bash
-slsb run --upstream <model> --tasks sid --seeds 0,1,2 --data-dir data --params params.yaml \
-         --out results/v0.4/<folder>_sid
-python scripts/log_results.py results/v0.4/<folder>_sid --carry-over \
-    --name <same name as in slsb-v0.3> --kind ... --family ... --base-model ...
+slsb run --upstream <model> --tasks ic --seeds 0,1,2 --data-dir data --params params.yaml \
+         --out results/v0.5/<folder>_ic
+python scripts/log_results.py results/v0.5/<folder>_ic --carry-over \
+    --name <same name as in slsb-v0.4> --kind ... --family ... --base-model ...
 ```
 
 ## Repository layout
@@ -214,7 +215,7 @@ python scripts/log_results.py results/v0.4/<folder>_sid --carry-over \
 │   ├── metrics/, utils/       # WER/CER/EER/accuracy, datasets and splits, MLflow logging
 ├── data_prep/                 # builds data/ from each source; make_splits.py writes split_v2.json
 ├── data.dvc                   # pointer to the versioned data/ on DagsHub
-├── params.yaml                # upstream + downstream-head hyperparameters (the v0.4 protocol)
+├── params.yaml                # upstream + downstream-head hyperparameters (the v0.5 protocol)
 ├── configs/tasks/             # one card per task family
 ├── docs/                      # protocol, tasks, data, results; figures and their source CSVs
 ├── tests/                     # unit and protocol tests (no GPU, data or network needed)
@@ -247,8 +248,9 @@ python scripts/log_results.py results/v0.4/<folder>_sid --carry-over \
   single speaker, so no speaker-disjoint split) and `er_sinhala` (broken source metadata).
 - **Several test sets are small:** Tamil diarization has 5 test recordings, and Tamil ASR
   has 5 test speakers. Their scores move more between seeds and between models.
-- **`ic_banking_sinhala` has no speaker information,** so its split is random and its
-  score is optimistic.
+- **Intent test sets are unseen sentences, not unseen speakers.** Since v0.5 every intent
+  fold holds out whole prompts, so the same person can read in train and test
+  (`ic_banking_sinhala` records no speakers at all).
 - **No pre-training contamination check yet.** Nothing verifies that an upstream never
   saw a test clip during pre-training. SLCeleb is YouTube audio, so YouTube-based
   pre-training corpora could overlap with it.
@@ -275,7 +277,7 @@ and BibTeX from it.
              S. A. Talagala and Uthayasanker Thayasivam},
   title   = {{SLSB}: {Sinhala} \& {Lankan-Tamil} Speech Benchmark},
   url     = {https://github.com/EchoVerge-Labs/SLSB-benchmark},
-  version = {0.4.0},
+  version = {0.5.0},
   year    = {2026}
 }
 ```
