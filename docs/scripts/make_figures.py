@@ -30,7 +30,7 @@ REPO = Path(__file__).resolve().parents[2]
 OUT = REPO / "docs" / "assets"
 TABLES = REPO / "docs" / "results"
 TASKS_CSV = TABLES / "tasks.csv"
-RESULTS_CSV = TABLES / "reference_xlsr300m_norm_v0.2.csv"
+RESULTS_CSV = TABLES / "reference_xlsr300m_copt200h_norm_v0.4.csv"
 
 THEMES = {
     "light": dict(surface="#fcfcfb", ink="#0b0b0b", ink2="#52514e", muted="#898781",
@@ -105,7 +105,9 @@ def refresh(results_dirs):
                 speakers = len({Path(f).stem.rsplit("_", 1)[0] for f in files})
             else:
                 speakers = ""
-            scheme = "5 folds" if "folds" in split else "train/dev/test"
+            scheme = ("5 folds" if "folds" in split else
+                      "train/dev/test, unseen videos" if split["split_type"].startswith("video_disjoint")
+                      else "train/dev/test")
         rows.append(dict(task=task, family=family, language=lang, source=source, split_type=split["split_type"],
                          scheme=scheme, clips=clips, hours=round(hrs, 2), speakers=speakers))
     TABLES.mkdir(parents=True, exist_ok=True)
@@ -224,7 +226,7 @@ def fig_results(t, theme):
         ax.set_xticks([0, 0.25, 0.5, 0.75, 1.0])
         ax.set_title(heading, loc="left", fontsize=9.5, color=t["ink2"], pad=8)
     title(fig, t, "Reference run: XLS-R 300M after Sinhala/Tamil continued pre-training",
-          "Mean of 3 seeds (dot) and their range (line).  * no speaker ids: the same speakers can be in train "
+          "Protocol v0.4. Mean of 3 seeds (dot) and their range (line).  * no speaker ids: the same speakers can be in train "
           "and test, so it is optimistic.")
     fig.subplots_adjust(left=0.17, right=0.98, top=0.78, bottom=0.08)
     save(fig, "fig2-reference-results", theme)

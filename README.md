@@ -95,34 +95,34 @@ seeds, feature caching, hyperparameters and leakage checks.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/fig2-reference-results-dark.png">
-  <img alt="Reference run of XLS-R 300M after continued pre-training on 200 h of Sinhala and Tamil. Error rates: ASR WER 0.635 Sinhala and 0.802 Tamil, CER 0.164 and 0.296, verification EER 0.154, diarization DER 0.111 Sinhala and 0.085 Tamil. Accuracy: emotion 0.405, speaker ID 0.992, intent banking 0.987 Sinhala and 0.767 Tamil, intent health 0.487." src="docs/assets/fig2-reference-results-light.png">
+  <img alt="Reference run of XLS-R 300M after continued pre-training on 200 h of Sinhala and Tamil, protocol v0.4. Error rates: ASR WER 0.612 Sinhala and 0.800 Tamil, CER 0.156 and 0.285, verification EER 0.143, diarization DER 0.070 Sinhala and 0.026 Tamil. Accuracy: emotion 0.411, speaker ID 0.876, intent banking 0.992 Sinhala and 0.842 Tamil, intent health 0.541." src="docs/assets/fig2-reference-results-light.png">
 </picture>
 
 **XLS-R 300M after continued pre-training** on 200 h of Sinhala and Tamil
 ([Model-Training-Pipeline](https://github.com/EchoVerge-Labs/Model-Training-Pipeline),
-checkpoint 9000), **v0.2 protocol**, 3 seeds. These predate v0.3's per-layer layer norm and
-are not comparable with v0.3 scores; the reference model is being re-run under v0.3:
+checkpoint 9000), **protocol v0.4**, 3 seeds:
 
 | Task | Language | Metric | Mean ± s.d. |
 |---|---|---|---|
-| ASR | Sinhala | WER ↓ / CER ↓ | 0.635 ± 0.008 / 0.164 ± 0.002 |
-| ASR | Tamil | WER ↓ / CER ↓ | 0.802 ± 0.006 / 0.296 ± 0.002 |
-| Emotion recognition | Tamil | accuracy ↑ / macro-F1 ↑ | 0.405 ± 0.018 / 0.387 ± 0.033 |
-| Speaker identification | Tamil | accuracy ↑ | 0.992 ± 0.003 |
-| Speaker verification | Tamil | EER ↓ | 0.154 ± 0.019 |
-| Speaker diarization | Sinhala | DER ↓ | 0.111 ± 0.011 |
-| Speaker diarization | Tamil | DER ↓ | 0.085 ± 0.026 |
-| Intent · banking | Sinhala | accuracy ↑ | 0.987 ± 0.002 \* |
-| Intent · banking | Tamil | accuracy ↑ | 0.767 ± 0.007 |
-| Intent · health | Tamil | accuracy ↑ | 0.487 ± 0.009 |
+| ASR | Sinhala | WER ↓ / CER ↓ | 0.612 ± 0.006 / 0.156 ± 0.003 |
+| ASR | Tamil | WER ↓ / CER ↓ | 0.800 ± 0.006 / 0.285 ± 0.006 |
+| Emotion recognition | Tamil | accuracy ↑ / macro-F1 ↑ | 0.411 ± 0.022 / 0.393 ± 0.031 |
+| Speaker identification | Tamil | accuracy ↑ / macro-F1 ↑ | 0.876 ± 0.003 / 0.856 ± 0.005 |
+| Speaker verification | Tamil | EER ↓ | 0.143 ± 0.016 |
+| Speaker diarization | Sinhala | DER ↓ | 0.070 ± 0.007 |
+| Speaker diarization | Tamil | DER ↓ | 0.026 ± 0.003 |
+| Intent · banking | Sinhala | accuracy ↑ | 0.992 ± 0.002 \* |
+| Intent · banking | Tamil | accuracy ↑ | 0.842 ± 0.017 |
+| Intent · health | Tamil | accuracy ↑ | 0.541 ± 0.000 |
 
 \* No speaker information exists for this dataset, so the same speakers can appear in train
 and test, which flatters the score.
 
-These are reference numbers for a single model, not a leaderboard. Scores from protocol
-v0.1 are **not comparable** with these, and the baseline encoders (XLS-R, WavLM, HuBERT,
-mHuBERT-147, wav2vec 2.0) are being re-run under v0.3. Every number above is read from
-[`docs/results/`](docs/results/); see [docs/results.md](docs/results.md).
+These are reference numbers for one model. All ten models benchmarked so far (five frozen
+encoders and their continued-pre-training counterparts) are compared in the
+[`slsb-v0.4` experiment on DagsHub](https://dagshub.com/EchoVerge-LABS/SLSB-benchmark/experiments),
+one row per model. Scores from different protocol versions are not comparable. Every number
+above is read from [`docs/results/`](docs/results/); see [docs/results.md](docs/results.md).
 
 ## Quick start
 
