@@ -1,7 +1,7 @@
-# Summary of the v0.4 protocol. The values the code actually uses live in
+# Summary of the v0.5 protocol. The values the code actually uses live in
 # params.yaml; see README.md "Protocol".
 evaluation:
-  protocol: v0.4
+  protocol: v0.5
   frozen_upstream: true
   layer_norm: true            # every hidden layer layer-normed before the weighted sum
   weighted_sum: true          # learned softmax weights over every hidden layer

@@ -6,9 +6,10 @@ data_prep/downloads/intent/ (the team's "Intent Classification" Drive folder):
   Banking/Tamil_Dataset.zip        -> data/ic_banking_tamil/    6 banking intents, 40 speakers
   Health/drive-download-*.zip      -> data/ic_health_tamil/     16 symptom intents, 100 speakers
 
-Each task gets audio/ (16 kHz mono PCM16), labels.csv (filename,label) and,
-where the source names speakers, speakers.csv (filename,speaker) -- which is
-what lets data_prep/make_splits.py split it speaker-disjointly.
+Each task gets audio/ (16 kHz mono PCM16), labels.csv (filename,label),
+sentences.csv (filename,sentence: which fixed prompt was read) and, where the
+source names speakers, speakers.csv (filename,speaker). data_prep/make_splits.py
+splits intent tasks by sentence, so test prompts are never heard in training.
 
 - Banking-Sinhala has no speaker information (filenames are recording
   timestamps), so it can only be split at random; see KNOWN_ISSUES.md.
@@ -46,7 +47,8 @@ def read_csv(zf, member, **kwargs):
 def banking_sinhala(zf):
     root = "Sinhala_Datset/"
     names = {r["intent"]: r["intent_details"].strip() for r in read_csv(zf, root + "Sinhala_Sentences.csv")}
-    return [(root + "audio_files/" + r["audio_file"], r["audio_file"], names[r["intent"]], None)
+    return [(root + "audio_files/" + r["audio_file"], r["audio_file"], names[r["intent"]], None,
+             f"{r['intent']}_{r['inflection']}")
             for r in read_csv(zf, root + "Sinhala_Data.csv")]
 
 
@@ -57,7 +59,7 @@ def banking_tamil(zf):
     for r in read_csv(zf, root + "Tamil_Data.csv"):
         speaker, name = r["audio_file"].split("/")
         items.append((root + "audio_files/" + r["audio_file"], f"{speaker}/{name.replace('..wav', '.wav')}",
-                      names[r["intent"]], speaker))
+                      names[r["intent"]], speaker, f"{r['intent']}_{r['inflection']}"))
     return items
 
 
@@ -70,7 +72,9 @@ def health_tamil(zf):
     for row in rows:
         stem = row[6].replace(":", "_")
         if stem in members:
-            items.append((members[stem], f"{stem}.wav", row[4].strip().lower(), row[1].strip()))
+            # The prompt's English text (column 5) identifies which of the 160 phrases was read.
+            items.append((members[stem], f"{stem}.wav", row[4].strip().lower(), row[1].strip(),
+                          " ".join(row[5].lower().split())))
     return items
 
 
@@ -89,7 +93,7 @@ def prepare(task, zip_path, reader):
 
     # Decode once: resample to 16 kHz mono, and find identical audio.
     decoded, labels_of = {}, defaultdict(set)
-    for member, filename, label, speaker in items:
+    for member, filename, label, speaker, _sentence in items:
         data, sr = sf.read(io.BytesIO(zf.read(member)), dtype="float32")
         audio = to_pcm16_16k_mono(data, sr)
         digest = hashlib.md5((audio * 32767).round().astype("int16").tobytes()).hexdigest()
@@ -97,7 +101,7 @@ def prepare(task, zip_path, reader):
         labels_of[digest].add(label)
 
     kept, seen = [], set()
-    for member, filename, label, speaker in items:
+    for member, filename, label, speaker, sentence in items:
         audio, digest = decoded[filename]
         if len(labels_of[digest]) > 1 or digest in seen:
             continue
@@ -106,24 +110,28 @@ def prepare(task, zip_path, reader):
         if not out.exists():
             out.parent.mkdir(parents=True, exist_ok=True)
             sf.write(str(out), audio, TARGET_SR, subtype="PCM_16")
-        kept.append((filename, label, speaker))
+        kept.append((filename, label, speaker, sentence))
 
     with open(task_dir / "labels.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["filename", "label"])
-        writer.writerows((fn, label) for fn, label, _ in kept)
-    if all(speaker is not None for _, _, speaker in kept):
+        writer.writerows((fn, label) for fn, label, _, _ in kept)
+    with open(task_dir / "sentences.csv", "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["filename", "sentence"])
+        writer.writerows((fn, sentence) for fn, _, _, sentence in kept)
+    if all(speaker is not None for _, _, speaker, _ in kept):
         with open(task_dir / "speakers.csv", "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(["filename", "speaker"])
-            writer.writerows((fn, speaker) for fn, _, speaker in kept)
+            writer.writerows((fn, speaker) for fn, _, speaker, _ in kept)
 
-    conflicting = sum(1 for _, filename, _, _ in items if len(labels_of[decoded[filename][1]]) > 1)
-    speakers = {s for _, _, s in kept if s is not None}
+    conflicting = sum(1 for _, filename, _, _, _ in items if len(labels_of[decoded[filename][1]]) > 1)
+    speakers = {s for _, _, s, _ in kept if s is not None}
     print(f"{task}: {len(items)} labelled clips -> {len(kept)} kept "
           f"({conflicting} with conflicting labels dropped, "
           f"{len(items) - len(kept) - conflicting} duplicate copies dropped); "
-          f"{len({label for _, label, _ in kept})} intents; "
+          f"{len({label for _, label, _, _ in kept})} intents, {len({s for *_, s in kept})} sentences; "
           f"{len(speakers) if speakers else 'no'} speakers")
 
 

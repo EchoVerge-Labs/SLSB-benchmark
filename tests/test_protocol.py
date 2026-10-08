@@ -146,6 +146,23 @@ def test_er_folds_are_speaker_disjoint(tmp_path):
     assert sum(len(f) for f in split["folds"]) == len(rows)
 
 
+def test_intent_folds_are_sentence_disjoint_and_train_every_intent(tmp_path):
+    task_dir = tmp_path / "ic_x"
+    task_dir.mkdir()
+    # 3 intents x 4 sentences x 5 readings; speakers are shared across folds.
+    files = [(f"spk{r}/{i}_{n}.wav", f"intent{i}", f"intent{i}_s{n}")
+             for i in range(3) for n in range(4) for r in range(5)]
+    _write_csv(task_dir / "labels.csv", ["filename", "label"], [(f, label) for f, label, _ in files])
+    _write_csv(task_dir / "sentences.csv", ["filename", "sentence"], [(f, s) for f, _, s in files])
+    split = make_splits.sentence_kfold_split(_spec(task_dir, "ic_x", "ic_x", "classification", "labels.csv"))
+    sentence_of = {f: s for f, _, s in files}
+    sentences = [{sentence_of[f] for f in fold} for fold in split["folds"]]
+    assert len(sentences) == 5
+    assert all(not (a & b) for i, a in enumerate(sentences) for b in sentences[i + 1:])
+    assert sum(len(f) for f in split["folds"]) == len(files)
+    assert split["split_type"] == "sentence_disjoint_5fold"
+
+
 def test_asv_split_holds_out_dev_speakers_with_balanced_trials(tmp_path):
     asv_dir = tmp_path / "asv"
     asv_dir.mkdir()
@@ -348,3 +365,5 @@ def test_carry_over_never_copies_a_task_the_protocol_changed():
     log_results = _load_log_results()
     previous, changed = log_results.CARRY_OVER["v0.4"]
     assert previous == "v0.3" and changed == {"sid"}
+    previous, changed = log_results.CARRY_OVER["v0.5"]
+    assert previous == "v0.4" and changed == {"ic_banking_sinhala", "ic_banking_tamil", "ic_health_tamil"}

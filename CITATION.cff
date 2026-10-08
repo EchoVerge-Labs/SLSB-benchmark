@@ -16,7 +16,7 @@ authors:
   - name: "Uthayasanker Thayasivam"
 repository-code: "https://github.com/EchoVerge-Labs/SLSB-benchmark"
 license: MIT
-version: "0.4.0"
+version: "0.5.0"
 date-released: "2026-10-08"
 keywords:
   - speech benchmark

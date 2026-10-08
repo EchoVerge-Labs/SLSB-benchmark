@@ -13,12 +13,14 @@ chosen on; the test set is scored once at the end.
                          speaker-disjoint is kept, so its scores stay comparable.
                          A single-speaker task (asr_omni_sinhala) can only be
                          split at random: split_type single_speaker_random.
-  ER, IC                 speaker-disjoint k-fold cross-validation, speakers from
-                         speakers.csv or (ER) the filename. For ER each sentence
-                         is recorded in most emotions, so sentence overlap
-                         doesn't give the label away -- speakers are what leak.
-  IC without speakers    (ic_banking_sinhala) a stratified random split, labelled
-                         random_stratified_no_speaker_ids: speakers may be shared.
+  ER                     speaker-disjoint k-fold cross-validation, speakers from
+                         the filename. Each sentence is recorded in most
+                         emotions, so sentence overlap doesn't give the label
+                         away -- speakers are what leak.
+  IC (sentences.csv)     sentence-disjoint k-fold cross-validation (v0.5): each
+                         intent is a handful of fixed prompts read many times,
+                         so a test prompt heard in training makes IC sentence
+                         matching. Speakers may be shared between folds.
   SID                    closed set (every speaker is a class), split by source
                          VIDEO: a speaker's test videos are never seen in
                          training (v0.4). Identical audio is kept to one copy,
@@ -241,6 +243,46 @@ def kfold_split(spec) -> dict:
     }
 
 
+def sentence_kfold_split(spec) -> dict:
+    """Intent tasks read a small set of fixed prompts many times, so a random or
+    speaker-disjoint split puts every test sentence in training and IC becomes
+    sentence matching. Here each intent's sentences are dealt round-robin over the
+    folds (shuffled, random start per intent): a test sentence is never trained on."""
+    rows = read_rows(spec.label_path)
+    label_of = {r["filename"]: r["label"] for r in rows}
+    sentence_of = {r["filename"]: r["sentence"] for r in read_rows(spec.task_dir / "sentences.csv")}
+    assert set(sentence_of) == set(label_of), f"{spec.name}: sentences.csv and labels.csv disagree"
+    intents_of_sentence = defaultdict(set)
+    for f, sentence in sentence_of.items():
+        intents_of_sentence[sentence].add(label_of[f])
+    assert all(len(v) == 1 for v in intents_of_sentence.values()), f"{spec.name}: a sentence has two intents"
+
+    rng = random.Random(SPLIT_SEED)
+    fold_of_sentence = {}
+    for intent in sorted(set(label_of.values())):
+        sentences = sorted(s for s, v in intents_of_sentence.items() if intent in v)
+        rng.shuffle(sentences)
+        start = rng.randrange(ER_FOLDS)
+        for i, sentence in enumerate(sentences):
+            fold_of_sentence[sentence] = (start + i) % ER_FOLDS
+    folds = [sorted(f for f in label_of if fold_of_sentence[sentence_of[f]] == k) for k in range(ER_FOLDS)]
+    for a in range(ER_FOLDS):
+        for b in range(a + 1, ER_FOLDS):
+            assert overlap(folds[a], folds[b], sentence_of) == 0
+    # Evaluation tests on fold k, selects on fold k+1 and trains on the rest: every intent must be trainable.
+    for k in range(ER_FOLDS):
+        train = [f for j, fold in enumerate(folds) if j not in (k, (k + 1) % ER_FOLDS) for f in fold]
+        assert {label_of[f] for f in train} == set(label_of.values()), f"{spec.name}: fold {k} lacks an intent"
+    return {
+        "protocol": "v0.5", "split_type": f"sentence_disjoint_{ER_FOLDS}fold", "folds": folds,
+        "diagnostics": {
+            "fold_clips": [len(f) for f in folds],
+            "fold_sentences": [len({sentence_of[i] for i in f}) for f in folds],
+            "fold_label_counts": [dict(Counter(label_of[i] for i in f)) for f in folds],
+        },
+    }
+
+
 def asv_split(asv_dir: Path) -> dict:
     rows = read_rows(asv_dir / "train_labels.csv")
     speaker_of = {r["filename"]: r["label"] for r in rows}
@@ -316,6 +358,8 @@ def main():
             split = asr_split(spec)
         elif spec.kind == "classification" and spec.task == "sid":
             split = video_disjoint_split(spec)
+        elif spec.kind == "classification" and (spec.task_dir / "sentences.csv").exists():
+            split = sentence_kfold_split(spec)
         elif spec.kind == "classification" and (spec.task == "er" or (spec.task_dir / "speakers.csv").exists()):
             split = kfold_split(spec)
         elif spec.kind == "classification":

@@ -39,7 +39,10 @@ DEFAULT_URI = "https://dagshub.com/EchoVerge-LABS/SLSB-benchmark.mlflow"
 # Protocol -> (the protocol it can carry results over from, tasks it changed). A task
 # a protocol did not change scores identically under the previous one, so with
 # --carry-over its metrics are copied from the model's run in slsb-<previous>.
-CARRY_OVER = {"v0.4": ("v0.3", {"sid"})}
+CARRY_OVER = {
+    "v0.4": ("v0.3", {"sid"}),
+    "v0.5": ("v0.4", {"ic_banking_sinhala", "ic_banking_tamil", "ic_health_tamil"}),
+}
 
 
 def load_folders(folders):
