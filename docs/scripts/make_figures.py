@@ -5,10 +5,14 @@
     python docs/scripts/make_figures.py --print    # ...and print the README tables
     python docs/scripts/make_figures.py --refresh  # first rebuild the CSVs from data/
                                                    # and a results directory (needs `dvc pull`)
+    python docs/scripts/make_figures.py --refresh-leaderboard
+                                                   # rebuild the leaderboard CSV from the
+                                                   # slsb-<protocol> MLflow runs (needs DAGSHUB_TOKEN)
 
 The CSVs in docs/results/ are versioned; every number in the figures and tables
 is read from them, nothing is typed in by hand. Each figure is written twice,
-for GitHub's light and dark themes, and the pages pick one with <picture>.
+for GitHub's light and dark themes, and the pages pick one with <picture>; the
+background is transparent so each sits directly on the page.
 
 Colour follows the language, never the rank: Sinhala and Tamil keep the same hue
 in every chart (the palette of the XLS-R codebook-experiment repository), and
@@ -31,18 +35,21 @@ OUT = REPO / "docs" / "assets"
 TABLES = REPO / "docs" / "results"
 TASKS_CSV = TABLES / "tasks.csv"
 RESULTS_CSV = TABLES / "reference_xlsr300m_copt200h_norm_v0.5.csv"
+LEADERBOARD_PROTOCOL = "v0.5"
+LEADERBOARD_CSV = TABLES / f"leaderboard_{LEADERBOARD_PROTOCOL}.csv"
+MLFLOW_URI = "https://dagshub.com/EchoVerge-LABS/SLSB-benchmark.mlflow"
 
 THEMES = {
-    "light": dict(surface="#fcfcfb", ink="#0b0b0b", ink2="#52514e", muted="#898781",
+    "light": dict(surface="#ffffff", ink="#0b0b0b", ink2="#52514e", muted="#898781",
                   grid="#e1e0d9", axis="#c3c2b7", Sinhala="#eb6834", Tamil="#1baf7a"),
-    "dark": dict(surface="#1a1a19", ink="#ffffff", ink2="#c3c2b7", muted="#898781",
+    "dark": dict(surface="#0d1117", ink="#ffffff", ink2="#c3c2b7", muted="#898781",
                  grid="#2c2c2a", axis="#383835", Sinhala="#d95926", Tamil="#199e70"),
 }
 
 # Display order and names. ASR omni / ASV Sinhala are excluded from v0.2 runs.
 TASKS = [
     ("asr_sinhala", "ASR", "Sinhala", "OpenSLR-52"),
-    ("asr_tamil", "ASR", "Tamil", "TaLk"),
+    ("asr_tamil", "ASR", "Tamil", "TaLK"),
     ("er_tamil", "Emotion recognition", "Tamil", "EmoTa"),
     ("sid", "Speaker identification", "Tamil", "SLCeleb"),
     ("asv_tamil", "Speaker verification", "Tamil", "SLCeleb"),
@@ -52,6 +59,30 @@ TASKS = [
     ("ic_banking_tamil", "Intent · banking", "Tamil", "Banking intents"),
     ("ic_health_tamil", "Intent · health", "Tamil", "Health intents"),
 ]
+# Leaderboard rows: MLflow run name, display name, upstream kind.
+MODELS = [
+    ("xlsr300m", "XLS-R 300M", "frozen"),
+    ("mhubert147", "mHuBERT-147", "frozen"),
+    ("wavlm-large", "WavLM Large", "frozen"),
+    ("wav2vec2-large-lv60", "wav2vec 2.0 Large", "frozen"),
+    ("hubert-large", "HuBERT Large", "frozen"),
+    ("xlsr300m-copt200h-norm", "XLS-R 300M", "adapted"),
+    ("mhubert147-copt200h", "mHuBERT-147", "adapted"),
+    ("wavlm-large-copt200h", "WavLM Large", "adapted"),
+    ("wav2vec2-large-lv60-copt200h", "wav2vec 2.0 Large", "adapted"),
+    ("hubert-large-copt200h", "HuBERT Large", "adapted"),
+]
+# Leaderboard columns: one primary metric per task, grouped by family.
+LEADERBOARD = [
+    ("ASR ↓", [("asr_sinhala", "wer", "Si"), ("asr_tamil", "wer", "Ta")]),
+    ("ER ↑", [("er_tamil", "accuracy", "Ta")]),
+    ("SID ↑", [("sid", "accuracy", "Ta")]),
+    ("ASV ↓", [("asv_tamil", "eer", "Ta")]),
+    ("SD ↓", [("sd_sinhala", "der", "Si"), ("sd_tamil", "der", "Ta")]),
+    ("IC ↑", [("ic_banking_sinhala", "accuracy", "Bank<br>Si"), ("ic_banking_tamil", "accuracy", "Bank<br>Ta"),
+              ("ic_health_tamil", "accuracy", "Health<br>Ta")]),
+]
+LOWER_IS_BETTER = {"wer", "cer", "eer", "der"}
 PRIMARY = {"asr": ["wer", "cer"], "asv": ["eer"], "sd": ["der"], "er": ["accuracy", "macro_f1"],
            "sid": ["accuracy", "macro_f1"], "ic": ["accuracy", "macro_f1"]}
 
@@ -135,9 +166,68 @@ def refresh(results_dirs):
     print(f"wrote {TASKS_CSV.relative_to(REPO)} and {RESULTS_CSV.relative_to(REPO)}")
 
 
+def refresh_leaderboard():
+    """Every model's mean and s.d. over seeds, from its run in the slsb-<protocol> MLflow experiment."""
+    import os
+
+    from mlflow.tracking import MlflowClient
+
+    token = os.environ["DAGSHUB_TOKEN"]
+    os.environ.setdefault("MLFLOW_TRACKING_USERNAME", os.environ.get("DAGSHUB_USER", token))
+    os.environ.setdefault("MLFLOW_TRACKING_PASSWORD", token)
+    client = MlflowClient(MLFLOW_URI)
+    experiment = client.get_experiment_by_name(f"slsb-{LEADERBOARD_PROTOCOL}")
+    runs = {r.data.tags.get("slsb.model"): r.data.metrics
+            for r in client.search_runs([experiment.experiment_id], max_results=500)}
+    with open(LEADERBOARD_CSV, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["model", "name", "kind", "task", "metric", "mean", "std"])
+        for model, name, kind in MODELS:
+            metrics = runs[model]
+            for key in sorted(k for k in metrics if not k.endswith("_std")):
+                task, metric = key.split("/")
+                writer.writerow([model, name, kind, task, metric, f"{metrics[key]:.6f}",
+                                 f"{metrics.get(key + '_std', float('nan')):.6f}"])
+    print(f"wrote {LEADERBOARD_CSV.relative_to(REPO)}")
+
+
+def load_leaderboard():
+    with open(LEADERBOARD_CSV, newline="", encoding="utf-8") as f:
+        return {(r["model"], r["task"], r["metric"]): float(r["mean"]) for r in csv.DictReader(f)}
+
+
+def leaderboard_html():
+    """The README leaderboard: an HTML table, so families can head grouped columns."""
+    board = load_leaderboard()
+    cols = [c for _, group in LEADERBOARD for c in group]
+    best = {}
+    for task, metric, _ in cols:
+        vals = [board[(m, task, metric)] for m, _, _ in MODELS]
+        best[(task, metric)] = min(vals) if metric in LOWER_IS_BETTER else max(vals)
+    lines = ["<table>", "  <thead>", '    <tr>', '      <th rowspan="2" align="left">Upstream</th>']
+    lines += [f'      <th colspan="{len(g)}">{h}</th>' if len(g) > 1 else f"      <th>{h}</th>"
+              for h, g in LEADERBOARD]
+    lines += ["    </tr>", "    <tr>"] + [f"      <th>{label}</th>" for _, _, label in cols] + ["    </tr>", "  </thead>",
+                                                                                         "  <tbody>"]
+    for kind, heading in (("frozen", "Pre-trained checkpoints"),
+                          ("adapted", "After continued pre-training on 200 h of Sinhala and Tamil")):
+        lines.append(f'    <tr><td colspan="{len(cols) + 1}"><b>{heading}</b></td></tr>')
+        for model, name, k in MODELS:
+            if k != kind:
+                continue
+            cells = []
+            for task, metric, _ in cols:
+                v = board[(model, task, metric)]
+                text = f"{100 * v:.1f}"
+                cells.append(f'<td align="center">{"<b>" + text + "</b>" if v == best[(task, metric)] else text}</td>')
+            lines.append(f"    <tr><td>{name.replace(' ', '&nbsp;')}</td>{''.join(cells)}</tr>")
+    lines += ["  </tbody>", "</table>"]
+    return "\n".join(lines)
+
+
 # ----------------------------------------------------------------------- figures
 def style(ax, t):
-    ax.set_facecolor(t["surface"])
+    ax.set_facecolor("none")
     for side in ("top", "right", "left"):
         ax.spines[side].set_visible(False)
     ax.spines["bottom"].set_color(t["axis"])
@@ -152,9 +242,19 @@ def title(fig, t, text, sub):
     fig.text(0.012, 0.925, sub, ha="left", va="top", fontsize=9.5, color=t["ink2"])
 
 
+def language_legend(fig, t, marker, y):
+    """Colour marks the language; the legend names it, so colour is never the only cue."""
+    from matplotlib.lines import Line2D
+
+    handles = [Line2D([], [], linestyle="none", marker=marker, markersize=8, color=t[lang], label=lang)
+               for lang in ("Sinhala", "Tamil")]
+    fig.legend(handles=handles, loc="upper right", bbox_to_anchor=(0.985, y), ncol=2, frameon=False,
+               fontsize=9, labelcolor=t["ink2"], handletextpad=0.3, columnspacing=1.2)
+
+
 def save(fig, name, theme):
     OUT.mkdir(parents=True, exist_ok=True)
-    fig.savefig(OUT / f"{name}-{theme}.png", dpi=200, facecolor=fig.get_facecolor())
+    fig.savefig(OUT / f"{name}-{theme}.png", dpi=200, transparent=True)
     plt.close(fig)
 
 
@@ -175,7 +275,6 @@ def fig_tasks(t, theme):
     tasks = load_tasks()
     order = [task for task, *_ in TASKS]
     fig, ax = plt.subplots(figsize=(8.6, 4.6))
-    fig.patch.set_facecolor(t["surface"])
     style(ax, t)
     ys = list(range(len(order)))[::-1]
     for y, task in zip(ys, order):
@@ -189,7 +288,8 @@ def fig_tasks(t, theme):
     ax.set_xlabel("hours of audio")
     ax.set_xlim(0, max(float(r["hours"]) for r in tasks.values()) * 1.32)
     title(fig, t, "Ten tasks across Sinhala and Tamil",
-          "Audio per task; bar colour marks the language. Speaker ID and verification share SLCeleb's Tamil test audio.")
+          "Audio per task. Speaker ID and verification share SLCeleb's Tamil test audio.")
+    language_legend(fig, t, "s", 0.90)
     fig.subplots_adjust(left=0.28, right=0.97, top=0.84, bottom=0.12)
     save(fig, "fig1-tasks", theme)
 
@@ -209,7 +309,6 @@ def fig_results(t, theme):
             ("ic_health_tamil", "accuracy", "Intent · health")]),
     ]
     fig, axes = plt.subplots(1, 2, figsize=(10.4, 4.4), gridspec_kw=dict(wspace=0.62))
-    fig.patch.set_facecolor(t["surface"])
     for ax, (heading, rows) in zip(axes, panels):
         style(ax, t)
         ys = list(range(len(rows)))[::-1]
@@ -227,6 +326,7 @@ def fig_results(t, theme):
         ax.set_title(heading, loc="left", fontsize=9.5, color=t["ink2"], pad=8)
     title(fig, t, "Reference run: XLS-R 300M after Sinhala/Tamil continued pre-training",
           "Protocol v0.5. Mean of 3 seeds (dot) and their range (line). Intent is scored on sentences unseen in training.")
+    language_legend(fig, t, "o", 0.99)
     fig.subplots_adjust(left=0.17, right=0.98, top=0.78, bottom=0.08)
     save(fig, "fig2-reference-results", theme)
 
@@ -260,16 +360,22 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--refresh", nargs="*", metavar="RESULTS_DIR",
                         help="rebuild docs/results/*.csv from data/ and these results directories")
+    parser.add_argument("--refresh-leaderboard", action="store_true",
+                        help=f"rebuild {LEADERBOARD_CSV.name} from the slsb-{LEADERBOARD_PROTOCOL} MLflow runs")
     parser.add_argument("--print", action="store_true", help="print the README tables")
     args = parser.parse_args()
     if args.refresh is not None:
         refresh(args.refresh)
+    if args.refresh_leaderboard:
+        refresh_leaderboard()
     for theme, t in THEMES.items():
         fig_tasks(t, theme)
         fig_results(t, theme)
     print(f"wrote figures to {OUT.relative_to(REPO)}/")
     if args.print:
         print_tables()
+        print()
+        print(leaderboard_html())
 
 
 if __name__ == "__main__":

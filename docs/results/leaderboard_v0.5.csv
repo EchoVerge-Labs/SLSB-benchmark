@@ -1,0 +1,171 @@
+model,name,kind,task,metric,mean,std
+xlsr300m,XLS-R 300M,frozen,asr_sinhala,cer,0.174167,0.001045
+xlsr300m,XLS-R 300M,frozen,asr_sinhala,wer,0.670290,0.011466
+xlsr300m,XLS-R 300M,frozen,asr_tamil,cer,0.297127,0.008755
+xlsr300m,XLS-R 300M,frozen,asr_tamil,wer,0.813021,0.011631
+xlsr300m,XLS-R 300M,frozen,asv_tamil,eer,0.131478,0.016353
+xlsr300m,XLS-R 300M,frozen,er_tamil,accuracy,0.405139,0.023003
+xlsr300m,XLS-R 300M,frozen,er_tamil,macro_f1,0.393954,0.025974
+xlsr300m,XLS-R 300M,frozen,ic_banking_sinhala,accuracy,0.908455,0.004030
+xlsr300m,XLS-R 300M,frozen,ic_banking_sinhala,macro_f1,0.868094,0.006439
+xlsr300m,XLS-R 300M,frozen,ic_banking_tamil,accuracy,0.594178,0.007040
+xlsr300m,XLS-R 300M,frozen,ic_banking_tamil,macro_f1,0.476397,0.004549
+xlsr300m,XLS-R 300M,frozen,ic_health_tamil,accuracy,0.319259,0.007330
+xlsr300m,XLS-R 300M,frozen,ic_health_tamil,macro_f1,0.302635,0.005686
+xlsr300m,XLS-R 300M,frozen,sd_sinhala,der,0.072907,0.005436
+xlsr300m,XLS-R 300M,frozen,sd_tamil,der,0.044718,0.012523
+xlsr300m,XLS-R 300M,frozen,sid,accuracy,0.884842,0.003940
+xlsr300m,XLS-R 300M,frozen,sid,macro_f1,0.865990,0.003273
+mhubert147,mHuBERT-147,frozen,asr_sinhala,cer,0.166386,0.003783
+mhubert147,mHuBERT-147,frozen,asr_sinhala,wer,0.627717,0.019242
+mhubert147,mHuBERT-147,frozen,asr_tamil,cer,0.292302,0.003662
+mhubert147,mHuBERT-147,frozen,asr_tamil,wer,0.800833,0.010104
+mhubert147,mHuBERT-147,frozen,asv_tamil,eer,0.195643,0.009444
+mhubert147,mHuBERT-147,frozen,er_tamil,accuracy,0.405614,0.004065
+mhubert147,mHuBERT-147,frozen,er_tamil,macro_f1,0.388062,0.002030
+mhubert147,mHuBERT-147,frozen,ic_banking_sinhala,accuracy,0.914817,0.002283
+mhubert147,mHuBERT-147,frozen,ic_banking_sinhala,macro_f1,0.872795,0.002983
+mhubert147,mHuBERT-147,frozen,ic_banking_tamil,accuracy,0.634374,0.015015
+mhubert147,mHuBERT-147,frozen,ic_banking_tamil,macro_f1,0.501704,0.015525
+mhubert147,mHuBERT-147,frozen,ic_health_tamil,accuracy,0.388884,0.003089
+mhubert147,mHuBERT-147,frozen,ic_health_tamil,macro_f1,0.375523,0.003481
+mhubert147,mHuBERT-147,frozen,sd_sinhala,der,0.112838,0.001235
+mhubert147,mHuBERT-147,frozen,sd_tamil,der,0.142049,0.102467
+mhubert147,mHuBERT-147,frozen,sid,accuracy,0.740895,0.025574
+mhubert147,mHuBERT-147,frozen,sid,macro_f1,0.705732,0.021408
+wavlm-large,WavLM Large,frozen,asr_sinhala,cer,0.180719,0.003417
+wavlm-large,WavLM Large,frozen,asr_sinhala,wer,0.676760,0.018655
+wavlm-large,WavLM Large,frozen,asr_tamil,cer,0.287874,0.001159
+wavlm-large,WavLM Large,frozen,asr_tamil,wer,0.791250,0.002981
+wavlm-large,WavLM Large,frozen,asv_tamil,eer,0.165677,0.014097
+wavlm-large,WavLM Large,frozen,er_tamil,accuracy,0.397500,0.008598
+wavlm-large,WavLM Large,frozen,er_tamil,macro_f1,0.386741,0.009575
+wavlm-large,WavLM Large,frozen,ic_banking_sinhala,accuracy,0.905488,0.004037
+wavlm-large,WavLM Large,frozen,ic_banking_sinhala,macro_f1,0.857592,0.009580
+wavlm-large,WavLM Large,frozen,ic_banking_tamil,accuracy,0.671612,0.024725
+wavlm-large,WavLM Large,frozen,ic_banking_tamil,macro_f1,0.523015,0.024316
+wavlm-large,WavLM Large,frozen,ic_health_tamil,accuracy,0.408729,0.008273
+wavlm-large,WavLM Large,frozen,ic_health_tamil,macro_f1,0.391715,0.007440
+wavlm-large,WavLM Large,frozen,sd_sinhala,der,0.076717,0.019816
+wavlm-large,WavLM Large,frozen,sd_tamil,der,0.048990,0.011874
+wavlm-large,WavLM Large,frozen,sid,accuracy,0.841138,0.016199
+wavlm-large,WavLM Large,frozen,sid,macro_f1,0.827542,0.017276
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,asr_sinhala,cer,0.213953,0.002184
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,asr_sinhala,wer,0.719850,0.009543
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,asr_tamil,cer,0.361478,0.000826
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,asr_tamil,wer,0.893958,0.005637
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,asv_tamil,eer,0.180700,0.013868
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,er_tamil,accuracy,0.384221,0.005228
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,er_tamil,macro_f1,0.365219,0.008833
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,ic_banking_sinhala,accuracy,0.882975,0.002303
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,ic_banking_sinhala,macro_f1,0.835813,0.001717
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,ic_banking_tamil,accuracy,0.582024,0.021835
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,ic_banking_tamil,macro_f1,0.458525,0.020652
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,ic_health_tamil,accuracy,0.322115,0.006908
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,ic_health_tamil,macro_f1,0.308857,0.007798
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,sd_sinhala,der,0.090667,0.003274
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,sd_tamil,der,0.079552,0.009085
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,sid,accuracy,0.793618,0.011834
+wav2vec2-large-lv60,wav2vec 2.0 Large,frozen,sid,macro_f1,0.757255,0.017117
+hubert-large,HuBERT Large,frozen,asr_sinhala,cer,0.191797,0.000638
+hubert-large,HuBERT Large,frozen,asr_sinhala,wer,0.697723,0.005066
+hubert-large,HuBERT Large,frozen,asr_tamil,cer,0.330608,0.004653
+hubert-large,HuBERT Large,frozen,asr_tamil,wer,0.839896,0.006632
+hubert-large,HuBERT Large,frozen,asv_tamil,eer,0.174355,0.029625
+hubert-large,HuBERT Large,frozen,er_tamil,accuracy,0.431183,0.018677
+hubert-large,HuBERT Large,frozen,er_tamil,macro_f1,0.416080,0.024847
+hubert-large,HuBERT Large,frozen,ic_banking_sinhala,accuracy,0.895720,0.001024
+hubert-large,HuBERT Large,frozen,ic_banking_sinhala,macro_f1,0.856982,0.003196
+hubert-large,HuBERT Large,frozen,ic_banking_tamil,accuracy,0.723448,0.026115
+hubert-large,HuBERT Large,frozen,ic_banking_tamil,macro_f1,0.583410,0.026087
+hubert-large,HuBERT Large,frozen,ic_health_tamil,accuracy,0.412889,0.008943
+hubert-large,HuBERT Large,frozen,ic_health_tamil,macro_f1,0.398758,0.004758
+hubert-large,HuBERT Large,frozen,sd_sinhala,der,0.081455,0.005761
+hubert-large,HuBERT Large,frozen,sd_tamil,der,0.059991,0.017114
+hubert-large,HuBERT Large,frozen,sid,accuracy,0.798127,0.027115
+hubert-large,HuBERT Large,frozen,sid,macro_f1,0.772604,0.028725
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,asr_sinhala,cer,0.156472,0.002725
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,asr_sinhala,wer,0.611801,0.005719
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,asr_tamil,cer,0.285234,0.006386
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,asr_tamil,wer,0.799583,0.006070
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,asv_tamil,eer,0.143240,0.016221
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,er_tamil,accuracy,0.410872,0.022039
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,er_tamil,macro_f1,0.392508,0.030625
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,ic_banking_sinhala,accuracy,0.896101,0.003467
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,ic_banking_sinhala,macro_f1,0.854732,0.000479
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,ic_banking_tamil,accuracy,0.601219,0.008150
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,ic_banking_tamil,macro_f1,0.465332,0.001044
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,ic_health_tamil,accuracy,0.345636,0.000050
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,ic_health_tamil,macro_f1,0.333738,0.001456
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,sd_sinhala,der,0.069542,0.007003
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,sd_tamil,der,0.026311,0.002805
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,sid,accuracy,0.875824,0.002619
+xlsr300m-copt200h-norm,XLS-R 300M,adapted,sid,macro_f1,0.856488,0.005013
+mhubert147-copt200h,mHuBERT-147,adapted,asr_sinhala,cer,0.149619,0.000746
+mhubert147-copt200h,mHuBERT-147,adapted,asr_sinhala,wer,0.584369,0.005213
+mhubert147-copt200h,mHuBERT-147,adapted,asr_tamil,cer,0.283204,0.002671
+mhubert147-copt200h,mHuBERT-147,adapted,asr_tamil,wer,0.786250,0.001740
+mhubert147-copt200h,mHuBERT-147,adapted,asv_tamil,eer,0.200583,0.002956
+mhubert147-copt200h,mHuBERT-147,adapted,er_tamil,accuracy,0.397466,0.016878
+mhubert147-copt200h,mHuBERT-147,adapted,er_tamil,macro_f1,0.372618,0.017638
+mhubert147-copt200h,mHuBERT-147,adapted,ic_banking_sinhala,accuracy,0.920841,0.003699
+mhubert147-copt200h,mHuBERT-147,adapted,ic_banking_sinhala,macro_f1,0.872636,0.003721
+mhubert147-copt200h,mHuBERT-147,adapted,ic_banking_tamil,accuracy,0.710794,0.007315
+mhubert147-copt200h,mHuBERT-147,adapted,ic_banking_tamil,macro_f1,0.568974,0.007847
+mhubert147-copt200h,mHuBERT-147,adapted,ic_health_tamil,accuracy,0.464253,0.007351
+mhubert147-copt200h,mHuBERT-147,adapted,ic_health_tamil,macro_f1,0.448786,0.005833
+mhubert147-copt200h,mHuBERT-147,adapted,sd_sinhala,der,0.152611,0.032282
+mhubert147-copt200h,mHuBERT-147,adapted,sd_tamil,der,0.143187,0.058094
+mhubert147-copt200h,mHuBERT-147,adapted,sid,accuracy,0.737773,0.002753
+mhubert147-copt200h,mHuBERT-147,adapted,sid,macro_f1,0.701029,0.003297
+wavlm-large-copt200h,WavLM Large,adapted,asr_sinhala,cer,0.149748,0.000889
+wavlm-large-copt200h,WavLM Large,adapted,asr_sinhala,wer,0.603002,0.014074
+wavlm-large-copt200h,WavLM Large,adapted,asr_tamil,cer,0.263590,0.002084
+wavlm-large-copt200h,WavLM Large,adapted,asr_tamil,wer,0.747604,0.005081
+wavlm-large-copt200h,WavLM Large,adapted,asv_tamil,eer,0.147420,0.005136
+wavlm-large-copt200h,WavLM Large,adapted,er_tamil,accuracy,0.418175,0.006534
+wavlm-large-copt200h,WavLM Large,adapted,er_tamil,macro_f1,0.400865,0.007028
+wavlm-large-copt200h,WavLM Large,adapted,ic_banking_sinhala,accuracy,0.923997,0.002239
+wavlm-large-copt200h,WavLM Large,adapted,ic_banking_sinhala,macro_f1,0.872680,0.002865
+wavlm-large-copt200h,WavLM Large,adapted,ic_banking_tamil,accuracy,0.698448,0.007984
+wavlm-large-copt200h,WavLM Large,adapted,ic_banking_tamil,macro_f1,0.563987,0.006110
+wavlm-large-copt200h,WavLM Large,adapted,ic_health_tamil,accuracy,0.438123,0.012343
+wavlm-large-copt200h,WavLM Large,adapted,ic_health_tamil,macro_f1,0.420526,0.013275
+wavlm-large-copt200h,WavLM Large,adapted,sd_sinhala,der,0.064066,0.012713
+wavlm-large-copt200h,WavLM Large,adapted,sd_tamil,der,0.050127,0.026400
+wavlm-large-copt200h,WavLM Large,adapted,sid,accuracy,0.811655,0.007504
+wavlm-large-copt200h,WavLM Large,adapted,sid,macro_f1,0.788448,0.008270
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,asr_sinhala,cer,0.193995,0.002820
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,asr_sinhala,wer,0.687371,0.008631
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,asr_tamil,cer,0.330055,0.002241
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,asr_tamil,wer,0.853021,0.002658
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,asv_tamil,eer,0.175327,0.006944
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,er_tamil,accuracy,0.383248,0.009764
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,er_tamil,macro_f1,0.360074,0.022369
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,ic_banking_sinhala,accuracy,0.866144,0.010013
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,ic_banking_sinhala,macro_f1,0.816853,0.008983
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,ic_banking_tamil,accuracy,0.575175,0.015887
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,ic_banking_tamil,macro_f1,0.438464,0.017352
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,ic_health_tamil,accuracy,0.319259,0.004975
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,ic_health_tamil,macro_f1,0.309046,0.006765
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,sd_sinhala,der,0.088231,0.011245
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,sd_tamil,der,0.111212,0.031562
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,sid,accuracy,0.777315,0.024603
+wav2vec2-large-lv60-copt200h,wav2vec 2.0 Large,adapted,sid,macro_f1,0.740244,0.033126
+hubert-large-copt200h,HuBERT Large,adapted,asr_sinhala,cer,0.175331,0.002728
+hubert-large-copt200h,HuBERT Large,adapted,asr_sinhala,wer,0.660067,0.008973
+hubert-large-copt200h,HuBERT Large,adapted,asr_tamil,cer,0.309944,0.006370
+hubert-large-copt200h,HuBERT Large,adapted,asr_tamil,wer,0.817708,0.019166
+hubert-large-copt200h,HuBERT Large,adapted,asv_tamil,eer,0.177943,0.008271
+hubert-large-copt200h,HuBERT Large,adapted,er_tamil,accuracy,0.398660,0.005519
+hubert-large-copt200h,HuBERT Large,adapted,er_tamil,macro_f1,0.383919,0.007114
+hubert-large-copt200h,HuBERT Large,adapted,ic_banking_sinhala,accuracy,0.887388,0.006510
+hubert-large-copt200h,HuBERT Large,adapted,ic_banking_sinhala,macro_f1,0.834700,0.010574
+hubert-large-copt200h,HuBERT Large,adapted,ic_banking_tamil,accuracy,0.708229,0.024823
+hubert-large-copt200h,HuBERT Large,adapted,ic_banking_tamil,macro_f1,0.574456,0.020213
+hubert-large-copt200h,HuBERT Large,adapted,ic_health_tamil,accuracy,0.396222,0.001962
+hubert-large-copt200h,HuBERT Large,adapted,ic_health_tamil,macro_f1,0.378599,0.005130
+hubert-large-copt200h,HuBERT Large,adapted,sd_sinhala,der,0.070295,0.021806
+hubert-large-copt200h,HuBERT Large,adapted,sd_tamil,der,0.062333,0.021731
+hubert-large-copt200h,HuBERT Large,adapted,sid,accuracy,0.839057,0.001590
+hubert-large-copt200h,HuBERT Large,adapted,sid,macro_f1,0.822191,0.000841

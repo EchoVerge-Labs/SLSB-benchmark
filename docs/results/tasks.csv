@@ -1,6 +1,6 @@
 task,family,language,source,split_type,scheme,clips,hours,speakers
 asr_sinhala,ASR,Sinhala,OpenSLR-52,speaker_disjoint,train/dev/test,3000,3.61,478
-asr_tamil,ASR,Tamil,TaLk,speaker_disjoint,train/dev/test,1214,1.56,22
+asr_tamil,ASR,Tamil,TaLK,speaker_disjoint,train/dev/test,1214,1.56,22
 er_tamil,Emotion recognition,Tamil,EmoTa,speaker_disjoint_5fold,5 folds,936,0.72,22
 sid,Speaker identification,Tamil,SLCeleb,video_disjoint_closed_set,"train/dev/test, unseen videos",4993,17.98,40
 asv_tamil,Speaker verification,Tamil,SLCeleb,speaker_disjoint_from_trials,"37,720 test trials",18202,66.85,129

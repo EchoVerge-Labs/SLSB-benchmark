@@ -5,7 +5,7 @@
 **Upstream:** XLS-R 300M (`facebook/wav2vec2-xls-r-300m`) after continued pre-training on
 200 h of Sinhala and Tamil with normalised audio, in
 [Model-Training-Pipeline](https://github.com/EchoVerge-Labs/Model-Training-Pipeline),
-checkpoint 9000. **Protocol** v0.5, **seeds** 0, 1, 2, on one NVIDIA GB10 GPU. Seven tasks
+checkpoint 9000. **Protocol** v0.5, **seeds** 0, 1, 2. Seven tasks
 were run under v0.3 (slsb 0.3.0), speaker identification under v0.4 (slsb 0.4.0) and the
 three intent tasks under v0.5 (slsb 0.5.0); each later protocol changed only the tasks it
 re-ran. A full run takes about 2 hours.
@@ -36,7 +36,10 @@ re-ran. A full run takes about 2 hours.
 | Intent · health | Tamil | Macro-F1 ↑ | 0.334 ± 0.001 |
 
 Per-seed values are in [`results/reference_xlsr300m_copt200h_norm_v0.5.csv`](results/reference_xlsr300m_copt200h_norm_v0.5.csv).
-The other models are compared on DagsHub, in the `slsb-v0.5` experiment.
+All ten models (five public checkpoints and the same five after continued pre-training) are
+compared in the README's leaderboard. Every metric's mean and s.d. per model are in
+[`results/leaderboard_v0.5.csv`](results/leaderboard_v0.5.csv), rebuilt from the `slsb-v0.5`
+DagsHub experiment with `python docs/scripts/make_figures.py --refresh-leaderboard`.
 
 ### Reading these numbers
 

@@ -5,13 +5,13 @@
 **A frozen-upstream, SUPERB-style benchmark for self-supervised speech models on Sinhala and Sri Lankan Tamil.**<br>
 Ten tasks across six families, leak-checked splits, standard downstream heads, and model selection on dev.
 
-[![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](#installation)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.14%20·%20CUDA%2013.0-EE4C2C?logo=pytorch&logoColor=white)](#installation)
+[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](#installation)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white)](#installation)
 [![Protocol](https://img.shields.io/badge/protocol-v0.5-2a78d6)](docs/protocol.md)
 [![Data](https://img.shields.io/badge/data-DVC%20·%20DagsHub-13ADC7?logo=dvc&logoColor=white)](docs/data.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-[Tasks](#tasks) · [Protocol](#protocol) · [Reference results](#reference-results) · [Quick start](#quick-start) · [Repository layout](#repository-layout) · [Documentation](#documentation) · [Limitations](#limitations) · [Changelog](CHANGELOG.md) · [Citation](#citation) · [License](#license)
+[Tasks](#tasks) · [Protocol](#protocol) · [Results](#results) · [Quick start](#quick-start) · [Repository layout](#repository-layout) · [Documentation](#documentation) · [Limitations](#limitations) · [Changelog](CHANGELOG.md) · [Citation](#citation) · [License](#license)
 
 </div>
 
@@ -41,18 +41,31 @@ copy of one, can be benchmarked with a single command.
   <img alt="Hours of audio per task: ASR Sinhala 3.6 h, ASR Tamil 1.6 h, emotion recognition Tamil 0.7 h, speaker identification Tamil 18.0 h, speaker verification Tamil 66.8 h, speaker diarization Sinhala 10.0 h and Tamil 2.0 h, intent classification banking Sinhala 6.8 h, banking Tamil 0.4 h, health Tamil 2.0 h." src="docs/assets/fig1-tasks-light.png">
 </picture>
 
-| Family | Task | Language | Data | Size | Speakers | Evaluation | Metric |
-|---|---|---|---|---|---|---|---|
-| Speech recognition | `asr_sinhala` | Sinhala | OpenSLR-52 | 3,000 clips · 3.6 h | 478 | speaker-disjoint train/dev/test | WER, CER |
-| | `asr_tamil` | Tamil | TaLk | 1,214 clips · 1.6 h | 22 | speaker-disjoint train/dev/test | WER, CER |
-| Emotion recognition | `er_tamil` | Tamil | EmoTa | 936 clips · 0.7 h | 22 | speaker-disjoint 5-fold CV | accuracy, macro-F1 |
-| Speaker identification | `sid` | Tamil | SLCeleb | 4,993 clips · 18.0 h | 40 | closed set; test videos unseen in training | accuracy, macro-F1 |
-| Speaker verification | `asv_tamil` | Tamil | SLCeleb | 18,202 clips · 66.8 h | 89 train · 40 test | 37,720 trials, unseen speakers | EER |
-| Speaker diarization | `sd_sinhala` | Sinhala | SiTa | 60 recordings · 10.0 h | 1–10 per recording | recording-disjoint, 24/12/24 | DER |
-| | `sd_tamil` | Tamil | SiTa | 14 recordings · 2.0 h | 2–6 per recording | recording-disjoint, 6/3/5 | DER |
-| Intent classification | `ic_banking_sinhala` | Sinhala | banking intents | 7,588 clips · 6.8 h | not recorded | sentence-disjoint 5-fold CV | accuracy, macro-F1 |
-| | `ic_banking_tamil` | Tamil | banking intents | 400 clips · 0.4 h | 40 | sentence-disjoint 5-fold CV | accuracy, macro-F1 |
-| | `ic_health_tamil` | Tamil | health intents | 1,453 clips · 2.0 h | 100 | sentence-disjoint 5-fold CV | accuracy, macro-F1 |
+<table>
+  <thead>
+    <tr><th align="left">Task</th><th align="left">Language</th><th align="left">Corpus</th><th>Speakers</th><th align="left">Disjoint by</th><th align="left">Metric</th></tr>
+  </thead>
+  <tbody>
+    <tr><td colspan="6"><b>Speech recognition (ASR)</b></td></tr>
+    <tr><td><code>asr_sinhala</code></td><td>Sinhala</td><td>OpenSLR-52</td><td align="center">478</td><td>speaker</td><td>WER · CER</td></tr>
+    <tr><td><code>asr_tamil</code></td><td>Tamil</td><td>TaLK</td><td align="center">22</td><td>speaker</td><td>WER · CER</td></tr>
+    <tr><td colspan="6"><b>Emotion recognition (ER)</b></td></tr>
+    <tr><td><code>er_tamil</code></td><td>Tamil</td><td>EmoTa</td><td align="center">22</td><td>speaker · 5-fold</td><td>Acc · F1</td></tr>
+    <tr><td colspan="6"><b>Speaker identification (SID)</b></td></tr>
+    <tr><td><code>sid</code></td><td>Tamil</td><td>SLCeleb</td><td align="center">40</td><td>video</td><td>Acc · F1</td></tr>
+    <tr><td colspan="6"><b>Speaker verification (ASV)</b></td></tr>
+    <tr><td><code>asv_tamil</code></td><td>Tamil</td><td>SLCeleb</td><td align="center">89 + 40</td><td>speaker</td><td>EER</td></tr>
+    <tr><td colspan="6"><b>Speaker diarization (SD)</b></td></tr>
+    <tr><td><code>sd_sinhala</code></td><td>Sinhala</td><td>SiTa</td><td align="center">1–10</td><td>recording</td><td>DER</td></tr>
+    <tr><td><code>sd_tamil</code></td><td>Tamil</td><td>SiTa</td><td align="center">2–6</td><td>recording</td><td>DER</td></tr>
+    <tr><td colspan="6"><b>Intent classification (IC)</b></td></tr>
+    <tr><td><code>ic_banking_sinhala</code></td><td>Sinhala</td><td>Banking</td><td align="center">–</td><td>sentence · 5-fold</td><td>Acc · F1</td></tr>
+    <tr><td><code>ic_banking_tamil</code></td><td>Tamil</td><td>Banking</td><td align="center">40</td><td>sentence · 5-fold</td><td>Acc · F1</td></tr>
+    <tr><td><code>ic_health_tamil</code></td><td>Tamil</td><td>Health</td><td align="center">100</td><td>sentence · 5-fold</td><td>Acc · F1</td></tr>
+  </tbody>
+</table>
+
+<sub><b>Disjoint by</b>: no test item shares this with training (a speaker, a source video, a recording or a read sentence). Diarization counts speakers per recording; verification trains on 89 speakers and is tested on 40 others. Acc = accuracy, F1 = macro-F1. Clips and hours per task are in the chart above.</sub>
 
 Dataset sources, licences and per-task details are in **[docs/tasks.md](docs/tasks.md)**.
 Three tasks in `data/` are not run, each for a data-quality reason; see
@@ -91,37 +104,69 @@ rather than speech detection.
 The full protocol is in **[docs/protocol.md](docs/protocol.md)**: splits, model selection,
 seeds, feature caching, hyperparameters and leakage checks.
 
-## Reference results
+## Results
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/fig2-reference-results-dark.png">
-  <img alt="Reference run of XLS-R 300M after continued pre-training on 200 h of Sinhala and Tamil, protocol v0.5. Error rates: ASR WER 0.612 Sinhala and 0.800 Tamil, CER 0.156 and 0.285, verification EER 0.143, diarization DER 0.070 Sinhala and 0.026 Tamil. Accuracy: emotion 0.411, speaker ID 0.876, intent banking 0.896 Sinhala and 0.601 Tamil, intent health 0.346." src="docs/assets/fig2-reference-results-light.png">
-</picture>
+Ten upstreams under protocol v0.5: five public checkpoints, and the same five after continued
+pre-training on 200 h of Sinhala and Tamil
+([Model-Training-Pipeline](https://github.com/EchoVerge-Labs/Model-Training-Pipeline)).
+Each value is the mean over 3 seeds, in percent; **bold** marks the best in each column.
 
-**XLS-R 300M after continued pre-training** on 200 h of Sinhala and Tamil
-([Model-Training-Pipeline](https://github.com/EchoVerge-Labs/Model-Training-Pipeline),
-checkpoint 9000), **protocol v0.5**, 3 seeds:
+<table>
+  <thead>
+    <tr>
+      <th rowspan="2" align="left">Upstream</th>
+      <th colspan="2">ASR ↓</th>
+      <th>ER ↑</th>
+      <th>SID ↑</th>
+      <th>ASV ↓</th>
+      <th colspan="2">SD ↓</th>
+      <th colspan="3">IC ↑</th>
+    </tr>
+    <tr>
+      <th>Si</th>
+      <th>Ta</th>
+      <th>Ta</th>
+      <th>Ta</th>
+      <th>Ta</th>
+      <th>Si</th>
+      <th>Ta</th>
+      <th>Bank<br>Si</th>
+      <th>Bank<br>Ta</th>
+      <th>Health<br>Ta</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td colspan="11"><b>Pre-trained checkpoints</b></td></tr>
+    <tr><td>XLS-R&nbsp;300M</td><td align="center">67.0</td><td align="center">81.3</td><td align="center">40.5</td><td align="center"><b>88.5</b></td><td align="center"><b>13.1</b></td><td align="center">7.3</td><td align="center">4.5</td><td align="center">90.8</td><td align="center">59.4</td><td align="center">31.9</td></tr>
+    <tr><td>mHuBERT-147</td><td align="center">62.8</td><td align="center">80.1</td><td align="center">40.6</td><td align="center">74.1</td><td align="center">19.6</td><td align="center">11.3</td><td align="center">14.2</td><td align="center">91.5</td><td align="center">63.4</td><td align="center">38.9</td></tr>
+    <tr><td>WavLM&nbsp;Large</td><td align="center">67.7</td><td align="center">79.1</td><td align="center">39.8</td><td align="center">84.1</td><td align="center">16.6</td><td align="center">7.7</td><td align="center">4.9</td><td align="center">90.5</td><td align="center">67.2</td><td align="center">40.9</td></tr>
+    <tr><td>wav2vec&nbsp;2.0&nbsp;Large</td><td align="center">72.0</td><td align="center">89.4</td><td align="center">38.4</td><td align="center">79.4</td><td align="center">18.1</td><td align="center">9.1</td><td align="center">8.0</td><td align="center">88.3</td><td align="center">58.2</td><td align="center">32.2</td></tr>
+    <tr><td>HuBERT&nbsp;Large</td><td align="center">69.8</td><td align="center">84.0</td><td align="center"><b>43.1</b></td><td align="center">79.8</td><td align="center">17.4</td><td align="center">8.1</td><td align="center">6.0</td><td align="center">89.6</td><td align="center"><b>72.3</b></td><td align="center">41.3</td></tr>
+    <tr><td colspan="11"><b>After continued pre-training on 200 h of Sinhala and Tamil</b></td></tr>
+    <tr><td>XLS-R&nbsp;300M</td><td align="center">61.2</td><td align="center">80.0</td><td align="center">41.1</td><td align="center">87.6</td><td align="center">14.3</td><td align="center">7.0</td><td align="center"><b>2.6</b></td><td align="center">89.6</td><td align="center">60.1</td><td align="center">34.6</td></tr>
+    <tr><td>mHuBERT-147</td><td align="center"><b>58.4</b></td><td align="center">78.6</td><td align="center">39.7</td><td align="center">73.8</td><td align="center">20.1</td><td align="center">15.3</td><td align="center">14.3</td><td align="center">92.1</td><td align="center">71.1</td><td align="center"><b>46.4</b></td></tr>
+    <tr><td>WavLM&nbsp;Large</td><td align="center">60.3</td><td align="center"><b>74.8</b></td><td align="center">41.8</td><td align="center">81.2</td><td align="center">14.7</td><td align="center"><b>6.4</b></td><td align="center">5.0</td><td align="center"><b>92.4</b></td><td align="center">69.8</td><td align="center">43.8</td></tr>
+    <tr><td>wav2vec&nbsp;2.0&nbsp;Large</td><td align="center">68.7</td><td align="center">85.3</td><td align="center">38.3</td><td align="center">77.7</td><td align="center">17.5</td><td align="center">8.8</td><td align="center">11.1</td><td align="center">86.6</td><td align="center">57.5</td><td align="center">31.9</td></tr>
+    <tr><td>HuBERT&nbsp;Large</td><td align="center">66.0</td><td align="center">81.8</td><td align="center">39.9</td><td align="center">83.9</td><td align="center">17.8</td><td align="center">7.0</td><td align="center">6.2</td><td align="center">88.7</td><td align="center">70.8</td><td align="center">39.6</td></tr>
+  </tbody>
+</table>
 
-| Task | Language | Metric | Mean ± s.d. |
-|---|---|---|---|
-| ASR | Sinhala | WER ↓ / CER ↓ | 0.612 ± 0.006 / 0.156 ± 0.003 |
-| ASR | Tamil | WER ↓ / CER ↓ | 0.800 ± 0.006 / 0.285 ± 0.006 |
-| Emotion recognition | Tamil | accuracy ↑ / macro-F1 ↑ | 0.411 ± 0.022 / 0.393 ± 0.031 |
-| Speaker identification | Tamil | accuracy ↑ / macro-F1 ↑ | 0.876 ± 0.003 / 0.856 ± 0.005 |
-| Speaker verification | Tamil | EER ↓ | 0.143 ± 0.016 |
-| Speaker diarization | Sinhala | DER ↓ | 0.070 ± 0.007 |
-| Speaker diarization | Tamil | DER ↓ | 0.026 ± 0.003 |
-| Intent · banking | Sinhala | accuracy ↑ / macro-F1 ↑ | 0.896 ± 0.003 / 0.855 ± 0.000 |
-| Intent · banking | Tamil | accuracy ↑ / macro-F1 ↑ | 0.601 ± 0.008 / 0.465 ± 0.001 |
-| Intent · health | Tamil | accuracy ↑ / macro-F1 ↑ | 0.346 ± 0.000 / 0.334 ± 0.001 |
+<sub>ASR: word error rate. ER, SID, IC: accuracy (IC: mean over 5 sentence-disjoint folds). ASV: equal error
+rate. SD: diarization error rate. ↓ lower is better, ↑ higher is better. Si = Sinhala, Ta = Tamil;
+Bank and Health are the banking and health intent sets.</sub>
 
-Intent is scored on sentences never heard in training (v0.5).
+- **Continued pre-training lowers ASR WER for all five upstreams**, in both languages
+  (Sinhala by 3–7 points, Tamil by 1–4).
+- **Elsewhere its effect depends on the upstream.** mHuBERT-147 gains most on Tamil intent
+  (about 8 points on both tasks), while HuBERT Large and wav2vec 2.0 Large lose a little.
+- **XLS-R 300M is the strongest speaker model** (identification and verification), both
+  before and after continued pre-training.
 
-These are reference numbers for one model. All ten models benchmarked so far (five frozen
-encoders and their continued-pre-training counterparts) are compared in the
-[`slsb-v0.5` experiment on DagsHub](https://dagshub.com/EchoVerge-LABS/SLSB-benchmark/experiments),
-one row per model. Scores from different protocol versions are not comparable. Every number
-above is read from [`docs/results/`](docs/results/); see [docs/results.md](docs/results.md).
+Standard deviations, CER and macro-F1, a per-seed reference run and the per-protocol
+comparability rules are in **[docs/results.md](docs/results.md)**; the numbers above are read
+from [`docs/results/leaderboard_v0.5.csv`](docs/results/leaderboard_v0.5.csv), and every run is
+in the [`slsb-v0.5` experiment on DagsHub](https://dagshub.com/EchoVerge-LABS/SLSB-benchmark/experiments).
+Scores from different protocol versions are not comparable.
 
 ## Quick start
 
@@ -133,9 +178,8 @@ pip install git+https://github.com/EchoVerge-Labs/SLSB-benchmark.git@v0.5.0
 pip install -e ".[dev]"
 ```
 
-On ARM64 (e.g. NVIDIA DGX Spark / GB10), install `torch` and `torchaudio` as a matched pair
-from the native aarch64 CUDA wheels first, and do not install `flash-attn`; it does not build
-on this hardware.
+Install a `torch` / `torchaudio` pair that matches your CUDA version first if pip's default
+wheels don't.
 
 ### Data
 
@@ -160,8 +204,8 @@ slsb run --upstream facebook/wav2vec2-xls-r-300m \
 ```
 
 `--upstream` takes any Hugging Face repo id, a local checkpoint directory, or one of the
-aliases `xlsr`, `mhubert147` and `wavlm_large`. A full run takes about 3 hours per 300M-parameter
-model on one GB10 GPU. Outputs:
+aliases `xlsr`, `mhubert147` and `wavlm_large`. A full run of all ten tasks takes about
+3 hours for a 300M-parameter model on a single GPU. Outputs:
 
 | File | Contents |
 |---|---|
@@ -228,12 +272,12 @@ python scripts/log_results.py results/v0.5/<folder>_ic --carry-over \
 
 ## Documentation
 
-| | |
+| Document | Contents |
 |---|---|
 | [Protocol](docs/protocol.md) | Splits, heads, model selection, seeds, feature caching, hyperparameters, leakage checks |
 | [Tasks](docs/tasks.md) | Every task: source corpus, licence, size, split, metric and caveats |
 | [Data](docs/data.md) | Getting the data, rebuilding it from source, and the integrity checks |
-| [Results](docs/results.md) | Reference results, how they are produced, and how to regenerate the figures |
+| [Results](docs/results.md) | The leaderboard's sources, a per-seed reference run, comparability across protocol versions, and how to regenerate the figures |
 | [SLCeleb data issues](docs/slceleb_data_issues.md) | The duplicated Sinhala audio in SLCeleb, with a reproduction script |
 | [Known issues](KNOWN_ISSUES.md) | Exclusions and caveats, task by task |
 | [Changelog](CHANGELOG.md) | What changed between versions, and why v0.1 scores are not comparable |
