@@ -19,10 +19,12 @@ chosen on; the test set is scored once at the end.
                          doesn't give the label away -- speakers are what leak.
   IC without speakers    (ic_banking_sinhala) a stratified random split, labelled
                          random_stratified_no_speaker_ids: speakers may be shared.
-  SID                    closed set (every speaker is a class), so a stratified
-                         split. Identical audio is kept to one copy, and audio
-                         filed under more than one label is dropped (SLCeleb
-                         repeats ~1/3 of its clips, some under different ids).
+  SID                    closed set (every speaker is a class), split by source
+                         VIDEO: a speaker's test videos are never seen in
+                         training (v0.4). Identical audio is kept to one copy,
+                         and audio filed under more than one label is dropped
+                         (SLCeleb repeats ~1/3 of its clips, some under
+                         different ids).
   SD (sd_*)              recordings split train / dev / test (40/20/40): train
                          for the speaker-embedding head, dev for the clustering
                          threshold and early stopping, test for DER.
@@ -141,16 +143,65 @@ def asr_split(spec) -> dict:
     }
 
 
-def closed_set_split(spec, split_type: str = "stratified_closed_set") -> dict:
-    rows = read_rows(spec.label_path)
-    label_of = {r["filename"]: r["label"] for r in rows}
+def deduplicated_labels(spec):
+    """(label_of, ids, diagnostics): one copy of repeated audio is kept, and audio
+    filed under more than one label is dropped."""
+    label_of = {r["filename"]: r["label"] for r in read_rows(spec.label_path)}
     by_audio = defaultdict(list)
     for f in sorted(label_of):
         by_audio[audio_digest(spec.audio_dir / f)].append(f)
     ambiguous = [fs for fs in by_audio.values() if len({label_of[f] for f in fs}) > 1]
     ids = [fs[0] for fs in by_audio.values() if len({label_of[f] for f in fs}) == 1]
+    return label_of, ids, {
+        "classes": len({label_of[i] for i in ids}), "files": len(label_of),
+        "duplicate_copies_dropped": len(label_of) - len(ids) - sum(len(fs) for fs in ambiguous),
+        "ambiguous_label_files_dropped": sum(len(fs) for fs in ambiguous),
+    }
 
-    # (SID's v0.1 test set mixed copies of training clips into test, so it isn't kept.)
+
+def slceleb_video(filename: str) -> str:
+    """'id10001/interview/interview-03-012.wav' -> 'id10001/interview-03': the
+    source video a SLCeleb clip was cut from."""
+    speaker, _genre, name = filename.split("/")
+    return f"{speaker}/{Path(name).stem.rsplit('-', 1)[0]}"
+
+
+def video_disjoint_split(spec) -> dict:
+    """Closed-set speaker ID where test videos are never seen in training: per
+    speaker, ~20% of its videos (at least one) are test, one more is dev, the
+    rest train. Clips of one video share microphone, room and session, so a
+    random clip split lets a model recognise the recording instead of the voice
+    (v0.3: 100% of test clips had sibling clips from the same video in training)."""
+    label_of, ids, diagnostics = deduplicated_labels(spec)
+    videos = defaultdict(lambda: defaultdict(list))
+    for f in ids:
+        videos[label_of[f]][slceleb_video(f)].append(f)
+    rng = random.Random(SPLIT_SEED)
+    parts = {"train": [], "dev": [], "test": []}
+    for speaker in sorted(videos):
+        names = sorted(videos[speaker])
+        rng.shuffle(names)
+        n_test = max(1, round(TEST_FRACTION * len(names)))
+        if len(names) - n_test < 2:
+            raise ValueError(f"{spec.name}: speaker {speaker} has only {len(names)} videos")
+        assignment = {"test": names[:n_test], "dev": names[n_test:n_test + 1], "train": names[n_test + 1:]}
+        for part, chosen in assignment.items():
+            for name in chosen:
+                parts[part].extend(sorted(videos[speaker][name]))
+    for a, b in (("train", "dev"), ("train", "test"), ("dev", "test")):
+        assert not {slceleb_video(f) for f in parts[a]} & {slceleb_video(f) for f in parts[b]}, \
+            f"{spec.name}: a video is in both {a} and {b}"
+    for part, files in parts.items():
+        assert {label_of[f] for f in files} == {label_of[f] for f in ids}, f"{spec.name}: a speaker is missing from {part}"
+    return {
+        "protocol": "v0.4", "split_type": "video_disjoint_closed_set", **parts,
+        "diagnostics": {**diagnostics, **{f"{k}_clips": len(v) for k, v in parts.items()},
+                        **{f"{k}_videos": len({slceleb_video(f) for f in v}) for k, v in parts.items()}},
+    }
+
+
+def closed_set_split(spec, split_type: str = "stratified_closed_set") -> dict:
+    label_of, ids, diagnostics = deduplicated_labels(spec)
     rest, test = train_test_split(ids, test_size=TEST_FRACTION, random_state=SPLIT_SEED,
                                   stratify=[label_of[i] for i in ids])
     test_source = "new"
@@ -161,9 +212,7 @@ def closed_set_split(spec, split_type: str = "stratified_closed_set") -> dict:
     return {
         "protocol": "v0.2", "split_type": split_type, **parts,
         "diagnostics": {"test_set": test_source, **{f"{k}_clips": len(v) for k, v in parts.items()},
-                        "classes": len({label_of[i] for i in ids}), "files": len(label_of),
-                        "duplicate_copies_dropped": len(label_of) - len(ids) - sum(len(fs) for fs in ambiguous),
-                        "ambiguous_label_files_dropped": sum(len(fs) for fs in ambiguous)},
+                        **diagnostics},
     }
 
 
@@ -266,7 +315,7 @@ def main():
         if spec.kind == "asr":
             split = asr_split(spec)
         elif spec.kind == "classification" and spec.task == "sid":
-            split = closed_set_split(spec)
+            split = video_disjoint_split(spec)
         elif spec.kind == "classification" and (spec.task == "er" or (spec.task_dir / "speakers.csv").exists()):
             split = kfold_split(spec)
         elif spec.kind == "classification":

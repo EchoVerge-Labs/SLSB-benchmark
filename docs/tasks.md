@@ -45,8 +45,13 @@ over folds.
 ## Speaker identification: `sid`
 
 A closed-set task over SLCeleb's 40 Tamil test speakers: 4,993 clips, 18 h, of interviews,
-speeches and other YouTube videos. Every speaker is a class, so train / dev / test (stratified)
-share speakers by definition. Repeated audio is kept once. SLCeleb's 39 Sinhala test
+speeches and other YouTube videos. Every speaker is a class, so train / dev / test share
+speakers by definition. Since v0.4 the split is by **source video**: each speaker has 4–10
+videos, about 20% of them (at least one) are test and one is dev, so no test clip shares a
+recording session, microphone or room with training (3,209 / 823 / 961 clips; 156 / 40 / 46
+videos). With the v0.3 clip-level split every test clip had sibling clips from the same video
+in training, and every model scored 0.99+; on unseen videos frozen XLS-R drops to about 0.87.
+Repeated audio is kept once. SLCeleb's 39 Sinhala test
 speakers are dropped, because their audio is filed under several speaker IDs at once
 ([details](slceleb_data_issues.md)). The metrics are accuracy and macro-F1.
 

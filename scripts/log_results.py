@@ -18,7 +18,9 @@ format and never leaves a half-logged run behind.
         --base-model facebook/wav2vec2-xls-r-300m --checkpoint 9000 --pretrain-hours 200
 
 Several folders may be given; a later one replaces an earlier one task by task
-(e.g. a re-run of one task). Needs DAGSHUB_TOKEN (and DAGSHUB_USER) in the
+(e.g. a re-run of one task). When a new protocol changes only some tasks, re-run
+those and pass --carry-over: the other tasks are copied from the model's run under
+the previous protocol (only for tasks listed as unchanged in CARRY_OVER). Needs DAGSHUB_TOKEN (and DAGSHUB_USER) in the
 environment. A model already logged for the protocol is left alone unless
 --replace is given.
 """
@@ -33,6 +35,11 @@ from collections import defaultdict
 from pathlib import Path
 
 DEFAULT_URI = "https://dagshub.com/EchoVerge-LABS/SLSB-benchmark.mlflow"
+
+# Protocol -> (the protocol it can carry results over from, tasks it changed). A task
+# a protocol did not change scores identically under the previous one, so with
+# --carry-over its metrics are copied from the model's run in slsb-<previous>.
+CARRY_OVER = {"v0.4": ("v0.3", {"sid"})}
 
 
 def load_folders(folders):
@@ -86,6 +93,26 @@ def layer_norm_of(summary, folders):
     return "unknown"
 
 
+def fetch_previous(uri, protocol, name):
+    """Metrics of `name`'s run in slsb-<protocol>."""
+    import mlflow
+    from mlflow.tracking import MlflowClient
+
+    token = os.environ.get("DAGSHUB_TOKEN")
+    if not token:
+        sys.exit("ERROR: DAGSHUB_TOKEN is not set")
+    os.environ.setdefault("MLFLOW_TRACKING_USERNAME", os.environ.get("DAGSHUB_USER", token))
+    os.environ.setdefault("MLFLOW_TRACKING_PASSWORD", token)
+    mlflow.set_tracking_uri(uri)
+    client = MlflowClient()
+    experiment = client.get_experiment_by_name(f"slsb-{protocol}")
+    runs = client.search_runs([experiment.experiment_id], filter_string=f"tags.`slsb.model` = '{name}'") \
+        if experiment else []
+    if not runs:
+        sys.exit(f"ERROR: no run named {name} in slsb-{protocol} to carry results over from")
+    return {"run_id": runs[0].info.run_id, "metrics": dict(runs[0].data.metrics)}
+
+
 def do_normalize_of(upstream):
     config = Path(upstream) / "preprocessor_config.json"
     if config.is_file():
@@ -108,6 +135,9 @@ def main():
     parser.add_argument("--slsb-commit", default=None, help="only needed if the results JSON predates the field")
     parser.add_argument("--mlflow-uri", default=DEFAULT_URI)
     parser.add_argument("--replace", action="store_true", help="delete (soft) an existing run of this model first")
+    parser.add_argument("--carry-over", action="store_true",
+                        help="take tasks missing from the folder(s) from this model's run under the previous "
+                             "protocol, for tasks the new protocol did not change (see CARRY_OVER)")
     parser.add_argument("--allow-incomplete", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -126,15 +156,35 @@ def main():
     if problems and not args.allow_incomplete:
         sys.exit("ERROR: incomplete results -- fix or pass --allow-incomplete")
 
+    carried = {}
+    if args.carry_over:
+        if protocol not in CARRY_OVER:
+            sys.exit(f"ERROR: protocol {protocol} has no previous protocol to carry results over from")
+        previous, changed = CARRY_OVER[protocol]
+        missing_changed = changed - set(by_task)
+        if missing_changed:
+            sys.exit(f"ERROR: {protocol} changed {sorted(changed)}; these must be re-run, not carried over: "
+                     f"{sorted(missing_changed)}")
+        carried = fetch_previous(args.mlflow_uri, previous, args.name)
+        old_tasks = sorted({k.split("/")[0] for k in carried["metrics"]} - set(by_task))
+        for key, value in carried["metrics"].items():
+            if key.split("/")[0] in old_tasks:
+                metrics[key] = value
+        carried["tasks"] = old_tasks
+        print(f"  carried over from slsb-{previous} run {carried['run_id']}: {', '.join(old_tasks)}")
+
     params = {
         "upstream": summary.get("upstream", ""), "kind": args.kind, "family": args.family,
         "base_model": args.base_model, "checkpoint": args.checkpoint, "pretrain_hours": args.pretrain_hours,
         "protocol": protocol, "slsb_version": summary.get("slsb_version") or args.slsb_version or "unknown",
         "slsb_commit": summary.get("slsb_commit") or args.slsb_commit or "unknown",
         "seeds": ",".join(map(str, seeds)),
-        "tasks": ",".join(sorted(by_task)), "layer_norm": layer_norm_of(summary, args.folders),
+        "tasks": ",".join(sorted(set(by_task) | set(carried.get("tasks", [])))),
+        "layer_norm": layer_norm_of(summary, args.folders),
         "do_normalize": do_normalize_of(summary.get("upstream", "")) or "model default",
     }
+    if carried:
+        params["carried_over"] = f"slsb-{CARRY_OVER[protocol][0]} run {carried['run_id']}: {','.join(carried['tasks'])}"
     tags = {"kind": args.kind, "family": args.family, "protocol": protocol, "slsb.model": args.name}
     if args.dry_run:
         print(json.dumps({"params": params, "tags": tags}, indent=1))

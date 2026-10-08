@@ -3,6 +3,28 @@
 Scores are only comparable within one protocol version. Every result records `protocol`
 and `slsb_version`.
 
+## v0.4.0 · 2026-10-08
+
+**Only speaker identification changed.** Every other task's split, code and settings are
+identical to v0.3, so their v0.3 scores carry over unchanged; only `sid` must be re-run.
+
+### Changed: protocol
+
+- **Speaker identification is split by source video.** Per speaker, about 20% of its
+  SLCeleb videos (at least one) form the test set and one more the dev set; no test clip
+  shares a recording session with training. Under v0.3's clip-level split all 961–999 test
+  clips had siblings from the same video in training, so the task partly measured
+  recognising the recording: every model scored 0.99+. Frozen XLS-R 300M drops from 0.995
+  to 0.874 on unseen videos (seed 0), which leaves room to separate models.
+- `make_splits.py` asserts that no video is in two parts and that every speaker appears in
+  train, dev and test.
+
+### Added
+
+- `scripts/log_results.py --carry-over`: log a v0.4 run from a re-run of the changed task
+  only. The unchanged tasks are copied from the model's `slsb-v0.3` run, and the run
+  records where they came from; a changed task can never be carried over.
+
 ## v0.3.1 · 2026-10-07
 
 Tooling only; the protocol is unchanged (still v0.3), so v0.3.0 and v0.3.1 scores are

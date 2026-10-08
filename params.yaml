@@ -1,4 +1,4 @@
-# SLSB v0.3 protocol: upstream and downstream-head settings. Splits live with the data
+# SLSB v0.4 protocol: upstream and downstream-head settings. Splits live with the data
 # (data/*/split_v2.json, written by data_prep/make_splits.py).
 #
 # Every head is selected on the dev split: each learning rate in lr_grid is

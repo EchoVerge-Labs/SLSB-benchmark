@@ -322,3 +322,29 @@ def test_log_results_summarizes_seeds_and_lets_later_folders_win(tmp_path):
     assert metrics["asr_x/wer"] == pytest.approx(0.6) and metrics["asr_x/wer_std"] == pytest.approx(0.1414, 1e-3)
     assert metrics["er_x/wer"] == pytest.approx(0.5)  # the failed seed in folder a was replaced by folder b
     assert problems == [] and len(rows) == 4
+
+
+def test_sid_split_is_video_disjoint_with_every_speaker_in_every_part(tmp_path):
+    task_dir = tmp_path / "sid"
+    rows = []
+    for s in range(3):
+        for v in range(5):            # 5 videos per speaker, 4 clips each
+            for c in range(4):
+                name = f"id{s:05d}/interview/interview-{v:02d}-{c:03d}.wav"
+                _wav(task_dir / "audio" / name, s * 1000 + v * 10 + c)
+                rows.append((name, f"id{s:05d}"))
+    _write_csv(task_dir / "labels.csv", ["filename", "label"], rows)
+    split = make_splits.video_disjoint_split(_spec(task_dir, "sid", "sid", "classification", "labels.csv"))
+    videos = {p: {make_splits.slceleb_video(f) for f in split[p]} for p in ("train", "dev", "test")}
+    assert not (videos["train"] & videos["test"]) and not (videos["train"] & videos["dev"]) \
+        and not (videos["dev"] & videos["test"])
+    for p in ("train", "dev", "test"):
+        assert {f.split("/")[0] for f in split[p]} == {"id00000", "id00001", "id00002"}
+    assert sum(len(split[p]) for p in ("train", "dev", "test")) == len(rows)
+    assert make_splits.slceleb_video("id10001/interview/interview-03-012.wav") == "id10001/interview-03"
+
+
+def test_carry_over_never_copies_a_task_the_protocol_changed():
+    log_results = _load_log_results()
+    previous, changed = log_results.CARRY_OVER["v0.4"]
+    assert previous == "v0.3" and changed == {"sid"}

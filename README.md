@@ -7,7 +7,7 @@ Ten tasks across six families, leak-checked splits, standard downstream heads, a
 
 [![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](#installation)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.14%20·%20CUDA%2013.0-EE4C2C?logo=pytorch&logoColor=white)](#installation)
-[![Protocol](https://img.shields.io/badge/protocol-v0.3-2a78d6)](docs/protocol.md)
+[![Protocol](https://img.shields.io/badge/protocol-v0.4-2a78d6)](docs/protocol.md)
 [![Data](https://img.shields.io/badge/data-DVC%20·%20DagsHub-13ADC7?logo=dvc&logoColor=white)](docs/data.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -46,7 +46,7 @@ copy of one, can be benchmarked with a single command.
 | Speech recognition | `asr_sinhala` | Sinhala | OpenSLR-52 | 3,000 clips · 3.6 h | 478 | speaker-disjoint train/dev/test | WER, CER |
 | | `asr_tamil` | Tamil | TaLk | 1,214 clips · 1.6 h | 22 | speaker-disjoint train/dev/test | WER, CER |
 | Emotion recognition | `er_tamil` | Tamil | EmoTa | 936 clips · 0.7 h | 22 | speaker-disjoint 5-fold CV | accuracy, macro-F1 |
-| Speaker identification | `sid` | Tamil | SLCeleb | 4,993 clips · 18.0 h | 40 | closed set, train/dev/test | accuracy, macro-F1 |
+| Speaker identification | `sid` | Tamil | SLCeleb | 4,993 clips · 18.0 h | 40 | closed set; test videos unseen in training | accuracy, macro-F1 |
 | Speaker verification | `asv_tamil` | Tamil | SLCeleb | 18,202 clips · 66.8 h | 89 train · 40 test | 37,720 trials, unseen speakers | EER |
 | Speaker diarization | `sd_sinhala` | Sinhala | SiTa | 60 recordings · 10.0 h | 1–10 per recording | recording-disjoint, 24/12/24 | DER |
 | | `sd_tamil` | Tamil | SiTa | 14 recordings · 2.0 h | 2–6 per recording | recording-disjoint, 6/3/5 | DER |
@@ -129,7 +129,7 @@ mHuBERT-147, wav2vec 2.0) are being re-run under v0.3. Every number above is rea
 ### Installation
 
 ```bash
-pip install git+https://github.com/EchoVerge-Labs/SLSB-benchmark.git@v0.3.1
+pip install git+https://github.com/EchoVerge-Labs/SLSB-benchmark.git@v0.4.0
 # or, from a clone, with test and lint tools
 pip install -e ".[dev]"
 ```
@@ -181,15 +181,25 @@ experiment table is the comparison table:
 
 ```bash
 export DAGSHUB_USER=<user> DAGSHUB_TOKEN=<token>
-python scripts/log_results.py results/v0.3/wavlm_large \
+python scripts/log_results.py results/v0.4/wavlm_large \
     --name wavlm-large --kind frozen --family wavlm --base-model microsoft/wavlm-large
-python scripts/log_results.py results/v0.3/xlsr300m_copt200h_norm \
+python scripts/log_results.py results/v0.4/xlsr300m_copt200h_norm \
     --name xlsr300m-copt200h-norm --kind adapted --family xlsr \
     --base-model facebook/wav2vec2-xls-r-300m --checkpoint 9000 --pretrain-hours 200
 ```
 
 A model already logged under a protocol is refused unless `--replace` is given. Prefer this
 over `slsb run --mlflow-uri`, which logs one run per task and seed.
+
+**Moving a model from v0.3 to v0.4** needs only a speaker-ID re-run (v0.4 changed nothing
+else); `--carry-over` copies the other nine tasks from the model's `slsb-v0.3` run:
+
+```bash
+slsb run --upstream <model> --tasks sid --seeds 0,1,2 --data-dir data --params params.yaml \
+         --out results/v0.4/<folder>_sid
+python scripts/log_results.py results/v0.4/<folder>_sid --carry-over \
+    --name <same name as in slsb-v0.3> --kind ... --family ... --base-model ...
+```
 
 ## Repository layout
 
@@ -204,7 +214,7 @@ over `slsb run --mlflow-uri`, which logs one run per task and seed.
 │   ├── metrics/, utils/       # WER/CER/EER/accuracy, datasets and splits, MLflow logging
 ├── data_prep/                 # builds data/ from each source; make_splits.py writes split_v2.json
 ├── data.dvc                   # pointer to the versioned data/ on DagsHub
-├── params.yaml                # upstream + downstream-head hyperparameters (the v0.3 protocol)
+├── params.yaml                # upstream + downstream-head hyperparameters (the v0.4 protocol)
 ├── configs/tasks/             # one card per task family
 ├── docs/                      # protocol, tasks, data, results; figures and their source CSVs
 ├── tests/                     # unit and protocol tests (no GPU, data or network needed)
@@ -265,7 +275,7 @@ and BibTeX from it.
              S. A. Talagala and Uthayasanker Thayasivam},
   title   = {{SLSB}: {Sinhala} \& {Lankan-Tamil} Speech Benchmark},
   url     = {https://github.com/EchoVerge-Labs/SLSB-benchmark},
-  version = {0.3.1},
+  version = {0.4.0},
   year    = {2026}
 }
 ```

@@ -1,4 +1,4 @@
-# Protocol (v0.3)
+# Protocol (v0.4)
 
 How SLSB turns a frozen encoder into a set of scores. Everything here is implemented in
 [`src/slsb/`](../src/slsb), and every hyperparameter lives in [`params.yaml`](../params.yaml).
@@ -57,7 +57,7 @@ with the data. Every upstream and every run seed uses the same partition.
 | ASR | train / dev / test, 70 / 10 / 20 | speaker-disjoint. `asr_sinhala`'s speakers come from OpenSLR-52's `utt_spk_text.tsv`; `asr_tamil`'s v0.1 test set is kept because it was already speaker-disjoint |
 | Emotion, intent with speakers | 5 folds | speaker-disjoint. For fold *k*: test = fold *k*, dev = fold *k*+1, train = the rest; reported as the mean over folds |
 | Intent without speakers | train / dev / test | stratified random (`ic_banking_sinhala`, flagged `random_stratified_no_speaker_ids`) |
-| Speaker identification | train / dev / test | closed set: every speaker is a class, stratified |
+| Speaker identification | train / dev / test | closed set: every speaker is a class. Split by source **video**: per speaker, ~20% of its videos are test and one is dev, so test clips never share a recording session with training (v0.4) |
 | Speaker verification | trial list = test | trained on SLCeleb dev speakers, none of them in the trials; dev trials (5,400, balanced) come from 9 held-out training speakers |
 | Speaker diarization | train / dev / test, 40 / 20 / 40 | recording-disjoint |
 

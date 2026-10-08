@@ -69,7 +69,7 @@ licence allows academic / research use only, no commercial use.
 | Task family | Status |
 |---|---|
 | `asr` | validated on `asr_sinhala`, `asr_tamil`; `asr_omni_sinhala` excluded (see above) |
-| `sid` | validated, Tamil speakers only (closed set) |
+| `sid` | validated, Tamil speakers only (closed set, test videos unseen in training since v0.4) |
 | `asv` | `asv_tamil` validated (speaker-disjoint); `asv_sinhala` excluded — corrupt SLCeleb Sinhala data |
 | `er` | validated on `er_tamil` only (speaker-disjoint 5-fold) |
 | `sd` | validated, oracle speech regions (see above) |
